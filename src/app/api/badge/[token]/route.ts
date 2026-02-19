@@ -31,9 +31,8 @@ function buildSvgBadge(
     : 'Never';
   const scoreStr = score !== null && isActive ? `${score}/100` : '—';
 
-  // Badge dimensions
-  const leftWidth = 110;   // "VibeTrace" section
-  const rightWidth = 130;  // score+date section
+  const leftWidth = 110;
+  const rightWidth = 130;
   const totalWidth = leftWidth + rightWidth;
   const height = 28;
 
@@ -53,21 +52,13 @@ function buildSvgBadge(
     </mask>
   </defs>
   <g mask="url(#rounded)">
-    <!-- Left: VibeTrace brand -->
     <rect width="${leftWidth}" height="${height}" fill="url(#bg-left)"/>
-    <!-- Right: status -->
     <rect x="${leftWidth}" width="${rightWidth}" height="${height}" fill="url(#bg-right)"/>
-    <!-- Separator -->
     <line x1="${leftWidth}" y1="0" x2="${leftWidth}" y2="${height}" stroke="rgba(0,0,0,0.2)" stroke-width="1"/>
-    
-    <!-- Left text: VibeTrace + shield icon -->
-    <text x="8" y="18" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="11" font-weight="700" fill="#BFDBFE" letter-spacing="0.3">🛡 VibeTrace</text>
-    
-    <!-- Right text: score and date -->
+    <text x="8" y="18" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="11" font-weight="700" fill="#BFDBFE" letter-spacing="0.3">&#x1F6E1; VibeTrace</text>
     <text x="${leftWidth + 8}" y="12" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="9" font-weight="700" fill="${text}">${label} · ${scoreStr}</text>
     <text x="${leftWidth + 8}" y="22" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="8" fill="${text}bb">Scanned ${dateStr}</text>
   </g>
-  <!-- Invisible link overlay (works in some SVG renderers) -->
   <a href="${summaryUrl}">
     <rect width="${totalWidth}" height="${height}" fill="transparent" rx="4"/>
   </a>
@@ -80,63 +71,63 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
+    const summaryUrl = `${APP_URL}/api/badge/${token}/summary`;
 
-    // Look up repo by badge token
-    const { data: repo, error: repoError } = await adminClient
-      .from('repos')
-      .select('id, name, full_name, last_scanned_at, user_id')
-      .eq('badge_token', token)
+    // Look up badge by token (public read policy allows this)
+    const { data: badge, error: badgeError } = await adminClient
+      .from('badges')
+      .select('id, repo_id, user_id, last_score, last_verified_at, is_active')
+      .eq('token', token)
       .single();
 
-    if (repoError || !repo) {
-      // Return grey badge for unknown token
-      const svg = buildSvgBadge(null, null, false, `${APP_URL}/badge/${token}/summary`);
+    if (badgeError || !badge) {
+      const svg = buildSvgBadge(null, null, false, summaryUrl);
       return new NextResponse(svg, {
-        headers: {
-          'Content-Type': 'image/svg+xml',
-          'Cache-Control': 'no-cache, max-age=0',
-        },
+        headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-cache, max-age=0' },
       });
     }
 
-    // Check if user has active subscription
+    // Check if user has active paid plan
     const { data: user } = await adminClient
       .from('users')
-      .select('plan, subscription_status')
-      .eq('id', repo.user_id)
+      .select('plan')
+      .eq('id', badge.user_id)
       .single();
 
-    const isActive = user?.plan !== 'free' || user?.subscription_status === 'active';
+    const hasPaidPlan = user?.plan !== 'free';
 
-    // Get latest completed scan
+    // Get latest completed scan for this repo
     const { data: latestScan } = await adminClient
       .from('scans')
       .select('score, completed_at')
-      .eq('repo_id', repo.id)
+      .eq('repo_id', badge.repo_id)
       .eq('status', 'complete')
       .order('completed_at', { ascending: false })
       .limit(1)
       .single();
 
-    // Check if scan is recent enough (within 30 days)
+    // Check if scan is recent (within 30 days)
     const isRecent = latestScan?.completed_at
       ? (Date.now() - new Date(latestScan.completed_at).getTime()) < 30 * 24 * 60 * 60 * 1000
       : false;
 
-    const summaryUrl = `${APP_URL}/api/badge/${token}/summary`;
-    const svg = buildSvgBadge(
-      isRecent ? latestScan?.score ?? null : null,
-      latestScan?.completed_at || null,
-      isActive && isRecent,
-      summaryUrl
-    );
+    const isActive = badge.is_active && isRecent;
+    const score = isActive ? (latestScan?.score ?? null) : null;
+
+    // Update badge cache
+    if (latestScan?.score !== undefined) {
+      await adminClient
+        .from('badges')
+        .update({ last_score: latestScan.score, last_verified_at: new Date().toISOString() })
+        .eq('id', badge.id);
+    }
+
+    const svg = buildSvgBadge(score, latestScan?.completed_at || null, isActive, summaryUrl);
 
     return new NextResponse(svg, {
       headers: {
         'Content-Type': 'image/svg+xml',
         'Cache-Control': 'public, max-age=3600, s-maxage=3600',
-        'X-VibeTrace-Score': latestScan?.score?.toString() || '',
-        'X-VibeTrace-Repo': repo.full_name,
       },
     });
   } catch (err: any) {

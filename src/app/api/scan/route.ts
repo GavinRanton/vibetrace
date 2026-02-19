@@ -163,6 +163,31 @@ async function processScan(
     // Update repo last scanned
     await adminClient.from("repos").update({ last_scanned_at: new Date().toISOString() }).eq("id", scanResult);
 
+    // Send email notification to user
+    try {
+      const { data: userRecord } = await adminClient
+        .from("users")
+        .select("email")
+        .eq("id", userId)
+        .single();
+      if (userRecord?.email) {
+        await sendScanCompleteEmail(userRecord.email, {
+          scan_id: scanId,
+          repo_name: repoFullName,
+          score,
+          total_findings: mappedFindings.length,
+          critical_count: counts.critical,
+          high_count: counts.high,
+          medium_count: counts.medium,
+          low_count: counts.low,
+          completed_at: new Date().toISOString(),
+        });
+        console.log("[VibeTrace] Scan complete email sent to:", userRecord.email);
+      }
+    } catch (emailErr) {
+      console.error("[VibeTrace] Email notification failed:", emailErr);
+    }
+
   } catch (error: any) {
     console.error("Scan processing error:", error);
     await adminClient.from("scans").update({
