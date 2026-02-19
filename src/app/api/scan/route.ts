@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { cloneRepo, runSemgrepScan, cleanupRepo, mapSeverity, categoriseFinding } from "@/lib/scanner/semgrep";
 import { translateFindings, calculateScore } from "@/lib/scanner/translate";
+import { sendScanCompleteEmail } from "@/lib/email";
 
 // Admin client for writing scan results (bypasses RLS)
 const adminClient = createClient(

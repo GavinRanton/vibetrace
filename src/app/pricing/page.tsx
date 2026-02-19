@@ -1,70 +1,63 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-const plans = [
-  {
-    name: "Free",
-    price: "£0",
-    period: "forever",
-    desc: "For indie devs and side projects.",
-    highlight: false,
-    cta: "Get started",
-    href: "/scan",
-    features: [
-      "5 scans per month",
-      "Public repos only",
-      "SAST & SCA scanning",
-      "7-day report history",
-      "Email notifications",
-    ],
-    missing: ["Private repos", "CI/CD integration", "API access", "SSO"],
-  },
-  {
-    name: "Pro",
-    price: "£29",
-    period: "per month",
-    desc: "For professional developers and small teams.",
-    highlight: true,
-    cta: "Start free trial",
-    href: "/scan",
-    features: [
-      "Unlimited scans",
-      "Public & private repos",
-      "SAST, SCA, Secrets & DAST",
-      "90-day report history",
-      "Slack & webhook alerts",
-      "GitHub Actions integration",
-      "AI-powered fix suggestions",
-      "Priority support",
-    ],
-    missing: ["SSO / SAML", "Custom policies"],
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    period: "per seat",
-    desc: "For teams that need compliance and control.",
-    highlight: false,
-    cta: "Contact us",
-    href: "mailto:hello@vibetrace.dev",
-    features: [
-      "Everything in Pro",
-      "SSO / SAML",
-      "Custom security policies",
-      "SOC2 & PCI-DSS reports",
-      "On-prem deployment",
-      "Dedicated SLA",
-      "Custom integrations",
-      "Training & onboarding",
-    ],
-    missing: [],
-  },
-];
+const features = {
+  free: [
+    "1 scan",
+    "3 vulnerability classes",
+    "Public repos only",
+  ],
+  freeMissing: [
+    "Fix prompts",
+    "Security score",
+    "Continuous monitoring",
+    "PDF reports",
+    "Security badge",
+    "GDPR checklist",
+  ],
+  starter: [
+    "Unlimited scans",
+    "15+ vulnerability classes",
+    "Fix prompts (AI-powered)",
+    "Security score",
+    "Public & private repos",
+  ],
+  starterMissing: [
+    "Continuous monitoring",
+    "PDF reports",
+    "Security badge",
+    "GDPR checklist",
+  ],
+  pro: [
+    "Everything in Starter",
+    "Continuous monitoring",
+    "PDF security reports",
+    "Security badge for README",
+    "GDPR checklist",
+    "Priority support",
+  ],
+  proMissing: [] as string[],
+};
 
 export default function PricingPage() {
+  const [annual, setAnnual] = useState(false);
+
+  const starterPrice = annual ? "£182" : "£19";
+  const starterPeriod = annual ? "per year" : "per month";
+  const starterNote = annual ? "Save 20% · £15.17/mo" : null;
+  const starterPriceKey = annual ? "starter_annual" : "starter_monthly";
+
+  const proPrice = annual ? "£470" : "£49";
+  const proPeriod = annual ? "per year" : "per month";
+  const proNote = annual ? "Save 20% · £39.17/mo" : null;
+  const proPriceKey = annual ? "pro_annual" : "pro_monthly";
+
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white">
       {/* Nav */}
@@ -86,7 +79,8 @@ export default function PricingPage() {
       </nav>
 
       <div className="max-w-5xl mx-auto px-6 py-20">
-        <div className="text-center mb-16">
+        {/* Header */}
+        <div className="text-center mb-12">
           <Badge className="mb-4 bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20">
             Simple pricing
           </Badge>
@@ -96,58 +90,170 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {/* Monthly / Annual toggle */}
+        <div className="flex items-center justify-center gap-3 mb-12">
+          <span className={`text-sm ${!annual ? "text-white" : "text-white/40"}`}>Monthly</span>
+          <button
+            onClick={() => setAnnual(!annual)}
+            className={`relative w-12 h-6 rounded-full transition-colors ${annual ? "bg-[#3B82F6]" : "bg-white/10"}`}
+            aria-label="Toggle annual billing"
+          >
+            <span
+              className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${annual ? "translate-x-7" : "translate-x-1"}`}
+            />
+          </button>
+          <span className={`text-sm ${annual ? "text-white" : "text-white/40"}`}>
+            Annual
+            <Badge className="ml-2 text-xs bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20">
+              Save 20%
+            </Badge>
+          </span>
+        </div>
+
+        {/* Main 3-column grid */}
         <div className="grid md:grid-cols-3 gap-6">
-          {plans.map((plan) => (
-            <Card
-              key={plan.name}
-              className={`relative flex flex-col ${
-                plan.highlight
-                  ? "border-[#3B82F6]/40 bg-[#3B82F6]/5 glow-blue"
-                  : "border-white/5 bg-white/[0.02]"
-              }`}
-            >
-              {plan.highlight && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-[#3B82F6] text-white border-0">Most popular</Badge>
+          {/* Free */}
+          <Card className="relative flex flex-col border-white/5 bg-white/[0.02]">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-white text-lg">Free</CardTitle>
+              <CardDescription className="text-white/40 text-sm">For indie devs and side projects.</CardDescription>
+              <div className="mt-4">
+                <span className="text-4xl font-bold text-white">£0</span>
+                <span className="text-white/40 text-sm ml-2">/ forever</span>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col gap-6">
+              <Button
+                className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10"
+                asChild
+              >
+                <Link href="/scan">Get started</Link>
+              </Button>
+              <Separator className="bg-white/5" />
+              <ul className="space-y-3 text-sm flex-1">
+                {features.free.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-white/70">
+                    <span className="text-[#10B981] mt-0.5 shrink-0">✓</span>
+                    {f}
+                  </li>
+                ))}
+                {features.freeMissing.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-white/25">
+                    <span className="mt-0.5 shrink-0">✕</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Starter */}
+          <Card className="relative flex flex-col border-white/5 bg-white/[0.02]">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-white text-lg">Starter</CardTitle>
+              <CardDescription className="text-white/40 text-sm">For developers who scan regularly.</CardDescription>
+              <div className="mt-4">
+                <span className="text-4xl font-bold text-white">{starterPrice}</span>
+                <span className="text-white/40 text-sm ml-2">/ {starterPeriod}</span>
+                {starterNote && (
+                  <p className="text-[#10B981] text-xs mt-1">{starterNote}</p>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col gap-6">
+              <Button
+                className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10"
+                data-price-key={starterPriceKey}
+                asChild
+              >
+                <Link href={`/scan?plan=starter&billing=${annual ? "annual" : "monthly"}`}>Get Starter</Link>
+              </Button>
+              <Separator className="bg-white/5" />
+              <ul className="space-y-3 text-sm flex-1">
+                {features.starter.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-white/70">
+                    <span className="text-[#10B981] mt-0.5 shrink-0">✓</span>
+                    {f}
+                  </li>
+                ))}
+                {features.starterMissing.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-white/25">
+                    <span className="mt-0.5 shrink-0">✕</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Pro */}
+          <Card className="relative flex flex-col border-[#3B82F6]/40 bg-[#3B82F6]/5">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+              <Badge className="bg-[#3B82F6] text-white border-0">Most popular</Badge>
+            </div>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-white text-lg">Pro</CardTitle>
+              <CardDescription className="text-white/40 text-sm">For teams that need full coverage.</CardDescription>
+              <div className="mt-4">
+                <span className="text-4xl font-bold text-white">{proPrice}</span>
+                <span className="text-white/40 text-sm ml-2">/ {proPeriod}</span>
+                {proNote && (
+                  <p className="text-[#10B981] text-xs mt-1">{proNote}</p>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col gap-6">
+              <Button
+                className="w-full bg-[#3B82F6] hover:bg-[#2563EB] text-white"
+                data-price-key={proPriceKey}
+                asChild
+              >
+                <Link href={`/scan?plan=pro&billing=${annual ? "annual" : "monthly"}`}>Get Pro</Link>
+              </Button>
+              <Separator className="bg-white/5" />
+              <ul className="space-y-3 text-sm flex-1">
+                {features.pro.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-white/70">
+                    <span className="text-[#10B981] mt-0.5 shrink-0">✓</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Deep Audit — one-time card */}
+        <div className="mt-10">
+          <Card className="border-[#8B5CF6]/30 bg-[#8B5CF6]/5 flex flex-col md:flex-row items-center justify-between gap-6 p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-[#8B5CF6]/20 flex items-center justify-center shrink-0">
+                <span className="text-xl">🔍</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-white font-semibold text-lg">Deep Audit</h3>
+                  <Badge className="bg-[#8B5CF6]/20 text-[#8B5CF6] border-[#8B5CF6]/30 text-xs">One-time</Badge>
                 </div>
-              )}
-              <CardHeader className="pb-4">
-                <CardTitle className="text-white text-lg">{plan.name}</CardTitle>
-                <CardDescription className="text-white/40 text-sm">{plan.desc}</CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-white">{plan.price}</span>
-                  <span className="text-white/40 text-sm ml-2">/ {plan.period}</span>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col gap-6">
-                <Button
-                  className={`w-full ${
-                    plan.highlight
-                      ? "bg-[#3B82F6] hover:bg-[#2563EB] text-white"
-                      : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
-                  }`}
-                  asChild
-                >
-                  <Link href={plan.href}>{plan.cta}</Link>
-                </Button>
-                <Separator className="bg-white/5" />
-                <ul className="space-y-3 text-sm flex-1">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-white/70">
-                      <span className="text-[#10B981] mt-0.5 shrink-0">✓</span>
-                      {f}
-                    </li>
-                  ))}
-                  {plan.missing.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-white/25">
-                      <span className="mt-0.5 shrink-0">✕</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
+                <p className="text-white/50 text-sm max-w-lg">
+                  A thorough, human-reviewed security audit of your repository. Includes a full vulnerability report,
+                  remediation roadmap, and a 30-minute call to walk through findings.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              <div className="text-right">
+                <p className="text-3xl font-bold text-white">£79</p>
+                <p className="text-white/40 text-xs">one-time payment</p>
+              </div>
+              <Button
+                className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white whitespace-nowrap"
+                asChild
+              >
+                <Link href="/scan?plan=deep_audit">Get Deep Audit</Link>
+              </Button>
+            </div>
+          </Card>
         </div>
 
         {/* FAQ teaser */}

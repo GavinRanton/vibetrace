@@ -1,25 +1,34 @@
-/**
- * Stripe client placeholder
- * Install stripe and configure env vars to activate.
- *
- * Required env vars:
- *   STRIPE_SECRET_KEY
- *   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
- *   STRIPE_WEBHOOK_SECRET
- */
+import Stripe from 'stripe';
 
-// TODO: Uncomment after installing stripe
-// import Stripe from 'stripe'
-//
-// export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-//   apiVersion: '2024-12-18.acacia',
-//   typescript: true,
-// })
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY is not set');
+}
 
-export const stripe = null; // placeholder — not yet configured
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2026-01-28.clover',
+  typescript: true,
+});
 
 export const STRIPE_PRICE_IDS = {
-  pro_monthly: "price_PLACEHOLDER_PRO_MONTHLY",
-  pro_yearly: "price_PLACEHOLDER_PRO_YEARLY",
-  enterprise: "price_PLACEHOLDER_ENTERPRISE",
+  starter_monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY!,
+  starter_annual:  process.env.STRIPE_PRICE_STARTER_ANNUAL!,
+  pro_monthly:     process.env.STRIPE_PRICE_PRO_MONTHLY!,
+  pro_annual:      process.env.STRIPE_PRICE_PRO_ANNUAL!,
+  deep_audit:      process.env.STRIPE_PRICE_DEEP_AUDIT!,
 } as const;
+
+export type PlanSlug = 'free' | 'starter' | 'pro' | 'deep_audit';
+
+/** Map a Stripe price ID back to a plan slug */
+export function planFromPriceId(priceId: string): PlanSlug {
+  if (priceId === process.env.STRIPE_PRICE_STARTER_MONTHLY || priceId === process.env.STRIPE_PRICE_STARTER_ANNUAL) {
+    return 'starter';
+  }
+  if (priceId === process.env.STRIPE_PRICE_PRO_MONTHLY || priceId === process.env.STRIPE_PRICE_PRO_ANNUAL) {
+    return 'pro';
+  }
+  if (priceId === process.env.STRIPE_PRICE_DEEP_AUDIT) {
+    return 'deep_audit';
+  }
+  return 'free';
+}
