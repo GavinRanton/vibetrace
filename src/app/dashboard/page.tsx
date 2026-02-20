@@ -1,3 +1,5 @@
+'use client'
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ChevronUp, ChevronDown, ShieldCheck } from "lucide-react";
+import { ChevronUp, ChevronDown, ShieldCheck, User, LogOut } from "lucide-react";
 
 const scansUsed = 3;
 const scansTotal = 5;
@@ -35,6 +37,12 @@ function SortHeader({ children }: { children: React.ReactNode }) {
       </span>
     </div>
   );
+}
+
+function handleSignOut() {
+  fetch('/api/auth/logout', { method: 'POST' }).then(() => {
+    window.location.href = '/'
+  })
 }
 
 export default function DashboardPage() {
@@ -73,10 +81,17 @@ export default function DashboardPage() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              href="/account"
+              className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2"
+            >
+              <User className="w-4 h-4" />
+              Account
+            </Link>
           </nav>
           <div className="mt-auto">
             <Separator className="bg-white/5 mb-4" />
-            <div className="px-3 py-2 rounded-md bg-white/[0.03] text-xs text-white/40">
+            <div className="px-3 py-2 rounded-md bg-white/[0.03] text-xs text-white/40 mb-3">
               <div className="font-medium text-white/70 mb-1">Free plan</div>
               <div>{scansUsed} / {scansTotal} scans used</div>
               <Progress value={scanPct} className="mt-2 h-1" />
@@ -87,6 +102,13 @@ export default function DashboardPage() {
                 Upgrade →
               </Link>
             </div>
+            <button
+              onClick={handleSignOut}
+              className="w-full px-3 py-2 rounded-md text-sm text-white/40 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
           </div>
         </aside>
 
