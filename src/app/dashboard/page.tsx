@@ -1,6 +1,8 @@
 'use client'
 
+import { Suspense } from 'react';
 import Link from "next/link";
+import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -45,12 +47,28 @@ function handleSignOut() {
   })
 }
 
+function CheckoutBanner() {
+  const searchParams = useSearchParams();
+  const checkoutSuccess = searchParams.get('checkout') === 'success';
+  if (!checkoutSuccess) return null;
+  return (
+    <div className="w-full bg-green-600 text-white text-center py-3 px-4 text-sm font-medium">
+      🎉 Payment successful! Your plan has been upgraded.
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const scanPct = (scansUsed / scansTotal) * 100;
   const lowOnScans = scansUsed > 3;
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white">
+      {/* Checkout success banner */}
+      <Suspense fallback={null}>
+        <CheckoutBanner />
+      </Suspense>
+
       {/* Sidebar + Main layout */}
       <div className="flex h-screen">
         {/* Sidebar */}

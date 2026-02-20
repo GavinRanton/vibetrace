@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, STRIPE_PRICE_IDS } from '@/lib/stripe';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   try {
+    // Get user if authenticated (optional)
+    let userId: string | undefined;
+    let userEmail: string | undefined;
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        userId = user.id;
+        userEmail = user.email;
+      }
+    } catch {}
+
     const body = await req.json() as {
       priceId?: string;
       priceKey?: keyof typeof STRIPE_PRICE_IDS;
@@ -26,13 +39,20 @@ export async function POST(req: NextRequest) {
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://vibetrace.app';
 
+    // Build metadata — include user info only if authenticated
+    const metadata: Record<string, string> = { priceId };
+    if (userId) {
+      metadata.user_id = userId;
+      metadata.email = userEmail ?? '';
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: isOneTime ? 'payment' : 'subscription',
       success_url: `${appUrl}/dashboard?checkout=success`,
       cancel_url:  `${appUrl}/pricing?checkout=cancelled`,
-      metadata: { priceId },
+      metadata,
     });
 
     return NextResponse.json({ url: session.url });

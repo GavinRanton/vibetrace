@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 );
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function upsertSubscription(sub: any) {
+async function upsertSubscription(sub: any, fallbackUserId?: string) {
   const priceId: string = sub.items?.data?.[0]?.price?.id ?? '';
   const plan = planFromPriceId(priceId);
   const customerId: string = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? '';
@@ -22,12 +22,23 @@ async function upsertSubscription(sub: any) {
     .eq('stripe_customer_id', customerId)
     .single();
 
-  if (!userData) {
+  let userId: string | undefined = userData?.id;
+
+  // Fallback: if no user found by customer ID, try fallbackUserId from session metadata
+  if (!userId && fallbackUserId) {
+    console.log('[webhook] Falling back to metadata user_id:', fallbackUserId);
+    // Ensure the user's stripe_customer_id is stored
+    await supabaseAdmin
+      .from('users')
+      .update({ stripe_customer_id: customerId })
+      .eq('id', fallbackUserId);
+    userId = fallbackUserId;
+  }
+
+  if (!userId) {
     console.warn('[webhook] No user found for customer', customerId);
     return;
   }
-
-  const userId = userData.id;
 
   await supabaseAdmin
     .from('users')
@@ -83,6 +94,7 @@ export async function POST(req: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        const metadataUserId = session.metadata?.user_id;
 
         if (session.mode === 'payment') {
           const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id ?? '';
@@ -92,11 +104,26 @@ export async function POST(req: NextRequest) {
             .eq('stripe_customer_id', customerId)
             .single();
 
-          if (userData) {
+          let targetUserId: string | undefined = userData?.id;
+
+          // Fallback: use metadata.user_id if no user found by customer ID
+          if (!targetUserId && metadataUserId) {
+            console.log('[webhook] payment fallback to metadata user_id:', metadataUserId);
             await supabaseAdmin
               .from('users')
-              .update({ plan: 'deep_audit' })
-              .eq('id', userData.id);
+              .update({ stripe_customer_id: customerId })
+              .eq('id', metadataUserId);
+            targetUserId = metadataUserId;
+          }
+
+          if (targetUserId) {
+            const priceId = session.metadata?.priceId ?? '';
+            const plan = priceId ? planFromPriceId(priceId) : 'deep_audit';
+
+            await supabaseAdmin
+              .from('users')
+              .update({ plan })
+              .eq('id', targetUserId);
 
             const paymentIntent = typeof session.payment_intent === 'string'
               ? session.payment_intent
@@ -105,13 +132,15 @@ export async function POST(req: NextRequest) {
             await supabaseAdmin
               .from('subscriptions')
               .upsert({
-                user_id: userData.id,
+                user_id: targetUserId,
                 stripe_customer_id: customerId,
                 stripe_payment_intent_id: paymentIntent,
-                plan: 'deep_audit',
+                plan,
                 status: 'active',
                 updated_at: new Date().toISOString(),
               }, { onConflict: 'user_id' });
+          } else {
+            console.warn('[webhook] checkout.session.completed: no user found for customer', customerId, 'or metadata user_id', metadataUserId);
           }
         }
         break;
@@ -119,6 +148,8 @@ export async function POST(req: NextRequest) {
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
+        // Pass session metadata user_id if available (not directly available here,
+        // but we handle fallback via stripe_customer_id linkage done at checkout)
         await upsertSubscription(event.data.object);
         break;
       }

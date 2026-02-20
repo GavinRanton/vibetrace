@@ -125,6 +125,9 @@ export default function PricingPage() {
             onClick={() => setAnnual(!annual)}
             className={`relative w-12 h-6 rounded-full transition-colors ${annual ? "bg-[#3B82F6]" : "bg-white/10"}`}
             aria-label="Toggle annual billing"
+            data-testid="pricing-toggle"
+            role="switch"
+            aria-checked={annual}
           >
             <span
               className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${annual ? "translate-x-7" : "translate-x-1"}`}
@@ -179,7 +182,7 @@ export default function PricingPage() {
               <CardTitle className="text-white text-lg">Starter</CardTitle>
               <CardDescription className="text-white/40 text-sm">For developers who scan regularly.</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-white">{starterPrice}</span>
+                <span className="text-4xl font-bold text-white" data-testid="price-starter">{starterPrice}</span>
                 <span className="text-white/40 text-sm ml-2">/ {starterPeriod}</span>
                 {starterNote && (
                   <p className="text-[#10B981] text-xs mt-1">{starterNote}</p>
@@ -220,7 +223,7 @@ export default function PricingPage() {
               <CardTitle className="text-white text-lg">Pro</CardTitle>
               <CardDescription className="text-white/40 text-sm">For teams that need full coverage.</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-white">{proPrice}</span>
+                <span className="text-4xl font-bold text-white" data-testid="price-pro">{proPrice}</span>
                 <span className="text-white/40 text-sm ml-2">/ {proPeriod}</span>
                 {proNote && (
                   <p className="text-[#10B981] text-xs mt-1">{proNote}</p>
@@ -294,6 +297,15 @@ export default function PricingPage() {
           </a>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-white/5 px-6 py-8 text-center text-[#94A3B8] text-sm">
+        <div className="flex items-center justify-center gap-6 flex-wrap">
+          <span>© 2026 VibeTrace</span>
+          <Link href="/terms" className="text-white/30 hover:text-white/60 text-sm transition-colors">Terms</Link>
+          <Link href="/privacy" className="text-white/30 hover:text-white/60 text-sm transition-colors">Privacy</Link>
+        </div>
+      </footer>
     </div>
   );
 }

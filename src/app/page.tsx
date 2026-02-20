@@ -291,7 +291,11 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-white/5 px-6 py-8 text-center text-[#94A3B8] text-sm">
-        © 2026 VibeTrace. Security for the vibe coding era.
+        <div className="flex items-center justify-center gap-6 flex-wrap">
+          <span>© 2026 VibeTrace. Security for the vibe coding era.</span>
+          <Link href="/terms" className="text-white/30 hover:text-white/60 text-sm transition-colors">Terms</Link>
+          <Link href="/privacy" className="text-white/30 hover:text-white/60 text-sm transition-colors">Privacy</Link>
+        </div>
       </footer>
     </div>
   );
