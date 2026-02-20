@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="80" viewBox="0 0 480 80">
+  <defs>
+    <filter id="glow-wm">
+      <feGaussianBlur stdDeviation="0.375" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="upper-wm">
+      <rect x="0" y="0" width="48" height="24"/>
+    </clipPath>
+    <clipPath id="lower-wm">
+      <rect x="0" y="24" width="48" height="24"/>
+    </clipPath>
+  </defs>
+  <!-- Icon area: 48x48 at (0,16) -->
+  <g transform="translate(0,16)">
+    <!-- Icon background -->
+    <rect x="0" y="0" width="48" height="48" fill="#0A0A0F" rx="6"/>
+    <!-- VT upper half (light) -->
+    <text clip-path="url(#upper-wm)" font-family="Inter, sans-serif" font-weight="800" font-size="28" text-anchor="middle" x="24" y="34" fill="#F8FAFC">VT</text>
+    <!-- VT lower half (blue) -->
+    <text clip-path="url(#lower-wm)" font-family="Inter, sans-serif" font-weight="800" font-size="28" text-anchor="middle" x="24" y="34" fill="#3B82F6">VT</text>
+    <!-- Scan line -->
+    <rect x="0" y="23" width="48" height="2" fill="#3B82F6" filter="url(#glow-wm)"/>
+  </g>
+  <!-- Wordmark text -->
+  <text font-family="Inter, sans-serif" font-weight="700" font-size="32" fill="#F8FAFC" x="64" y="52">VibeTrace</text>
+</svg>

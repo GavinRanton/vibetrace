@@ -2,10 +2,21 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+
+// Price IDs — read from NEXT_PUBLIC_ env vars at build time; fallback to known live IDs.
+// To override without a rebuild, add NEXT_PUBLIC_STRIPE_*_PRICE to .env.local and rebuild.
+const PRICE_IDS = {
+  starterMonthly: process.env.NEXT_PUBLIC_STRIPE_STARTER_MONTHLY_PRICE ?? 'price_1T2c90FL8TcuJGVGSIgaHwDo',
+  starterAnnual:  process.env.NEXT_PUBLIC_STRIPE_STARTER_ANNUAL_PRICE  ?? 'price_1T2c90FL8TcuJGVGYviA7xYd',
+  proMonthly:     process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE     ?? 'price_1T2c91FL8TcuJGVGLfduO87r',
+  proAnnual:      process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE      ?? 'price_1T2c92FL8TcuJGVGuMMfyzMl',
+  deepAudit:      process.env.NEXT_PUBLIC_STRIPE_DEEP_AUDIT_PRICE      ?? 'price_1T2c92FL8TcuJGVGUUovUx4p',
+};
 
 const features = {
   free: [
@@ -42,8 +53,25 @@ const features = {
     "GDPR checklist",
     "Priority support",
   ],
-  proMissing: [] as string[],
 };
+
+async function startCheckout(priceId: string) {
+  try {
+    const res = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ priceId }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      console.error("No checkout URL returned", data);
+    }
+  } catch (err) {
+    console.error("Checkout error", err);
+  }
+}
 
 export default function PricingPage() {
   const [annual, setAnnual] = useState(false);
@@ -51,12 +79,12 @@ export default function PricingPage() {
   const starterPrice = annual ? "£182" : "£19";
   const starterPeriod = annual ? "per year" : "per month";
   const starterNote = annual ? "Save 20% · £15.17/mo" : null;
-  const starterPriceKey = annual ? "starter_annual" : "starter_monthly";
+  const starterPriceId = annual ? PRICE_IDS.starterAnnual : PRICE_IDS.starterMonthly;
 
   const proPrice = annual ? "£470" : "£49";
   const proPeriod = annual ? "per year" : "per month";
   const proNote = annual ? "Save 20% · £39.17/mo" : null;
-  const proPriceKey = annual ? "pro_annual" : "pro_monthly";
+  const proPriceId = annual ? PRICE_IDS.proAnnual : PRICE_IDS.proMonthly;
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white">
@@ -90,8 +118,8 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Monthly / Annual toggle */}
-        <div className="flex items-center justify-center gap-3 mb-12">
+        {/* Monthly / Annual toggle — single flex row */}
+        <div className="flex flex-row items-center justify-center gap-3 mb-12">
           <span className={`text-sm ${!annual ? "text-white" : "text-white/40"}`}>Monthly</span>
           <button
             onClick={() => setAnnual(!annual)}
@@ -102,12 +130,10 @@ export default function PricingPage() {
               className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${annual ? "translate-x-7" : "translate-x-1"}`}
             />
           </button>
-          <span className={`text-sm ${annual ? "text-white" : "text-white/40"}`}>
-            Annual
-            <Badge className="ml-2 text-xs bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20">
-              Save 20%
-            </Badge>
-          </span>
+          <span className={`text-sm ${annual ? "text-white" : "text-white/40"}`}>Annual</span>
+          <Badge className="text-xs bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20 whitespace-nowrap">
+            Save 20%
+          </Badge>
         </div>
 
         {/* Main 3-column grid */}
@@ -127,19 +153,19 @@ export default function PricingPage() {
                 className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10"
                 asChild
               >
-                <Link href="/scan">Get started</Link>
+                <Link href="/signup">Get started</Link>
               </Button>
               <Separator className="bg-white/5" />
               <ul className="space-y-3 text-sm flex-1">
                 {features.free.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-white/70">
-                    <span className="text-[#10B981] mt-0.5 shrink-0">✓</span>
+                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: "#10B981" }} />
                     {f}
                   </li>
                 ))}
                 {features.freeMissing.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-white/25">
-                    <span className="mt-0.5 shrink-0">✕</span>
+                    <X size={16} className="mt-0.5 shrink-0" style={{ color: "#94A3B8" }} />
                     {f}
                   </li>
                 ))}
@@ -163,22 +189,21 @@ export default function PricingPage() {
             <CardContent className="flex-1 flex flex-col gap-6">
               <Button
                 className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10"
-                data-price-key={starterPriceKey}
-                asChild
+                onClick={() => startCheckout(starterPriceId)}
               >
-                <Link href={`/scan?plan=starter&billing=${annual ? "annual" : "monthly"}`}>Get Starter</Link>
+                Get Starter
               </Button>
               <Separator className="bg-white/5" />
               <ul className="space-y-3 text-sm flex-1">
                 {features.starter.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-white/70">
-                    <span className="text-[#10B981] mt-0.5 shrink-0">✓</span>
+                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: "#10B981" }} />
                     {f}
                   </li>
                 ))}
                 {features.starterMissing.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-white/25">
-                    <span className="mt-0.5 shrink-0">✕</span>
+                    <X size={16} className="mt-0.5 shrink-0" style={{ color: "#94A3B8" }} />
                     {f}
                   </li>
                 ))}
@@ -205,16 +230,15 @@ export default function PricingPage() {
             <CardContent className="flex-1 flex flex-col gap-6">
               <Button
                 className="w-full bg-[#3B82F6] hover:bg-[#2563EB] text-white"
-                data-price-key={proPriceKey}
-                asChild
+                onClick={() => startCheckout(proPriceId)}
               >
-                <Link href={`/scan?plan=pro&billing=${annual ? "annual" : "monthly"}`}>Get Pro</Link>
+                Get Pro
               </Button>
               <Separator className="bg-white/5" />
               <ul className="space-y-3 text-sm flex-1">
                 {features.pro.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-white/70">
-                    <span className="text-[#10B981] mt-0.5 shrink-0">✓</span>
+                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: "#10B981" }} />
                     {f}
                   </li>
                 ))}
@@ -228,7 +252,7 @@ export default function PricingPage() {
           <Card className="border-[#8B5CF6]/30 bg-[#8B5CF6]/5 flex flex-col md:flex-row items-center justify-between gap-6 p-6">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-[#8B5CF6]/20 flex items-center justify-center shrink-0">
-                <span className="text-xl">🔍</span>
+                <span className="text-sm font-bold text-[#8B5CF6]">DA</span>
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -248,23 +272,26 @@ export default function PricingPage() {
               </div>
               <Button
                 className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white whitespace-nowrap"
-                asChild
+                onClick={() => startCheckout(PRICE_IDS.deepAudit)}
               >
-                <Link href="/scan?plan=deep_audit">Get Deep Audit</Link>
+                Get Deep Audit
               </Button>
             </div>
           </Card>
         </div>
 
-        {/* FAQ teaser */}
+        {/* Questions section */}
         <div className="mt-20 text-center border-t border-white/5 pt-16">
           <h2 className="text-2xl font-bold mb-4">Questions?</h2>
           <p className="text-white/40 mb-6">
             We&apos;re happy to help. Reach out and we&apos;ll get back to you within 24 hours.
           </p>
-          <Button variant="outline" className="border-white/10 text-white/60 hover:text-white hover:border-white/20 bg-transparent">
+          <a
+            href="mailto:support@vibetrace.app"
+            className="inline-flex items-center justify-center rounded-md border border-white/10 px-4 py-2 text-sm text-white/60 hover:text-white hover:border-white/20 transition-colors bg-transparent"
+          >
             Contact support
-          </Button>
+          </a>
         </div>
       </div>
     </div>

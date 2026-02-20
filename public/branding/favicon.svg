@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <filter id="glow-fav">
+      <feGaussianBlur stdDeviation="0.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="upper-fav">
+      <rect x="0" y="0" width="32" height="16"/>
+    </clipPath>
+    <clipPath id="lower-fav">
+      <rect x="0" y="16" width="32" height="16"/>
+    </clipPath>
+  </defs>
+  <!-- Transparent background (no rect) -->
+  <!-- VT upper half (white) -->
+  <text clip-path="url(#upper-fav)" font-family="Inter, sans-serif" font-weight="800" font-size="20" text-anchor="middle" x="16" y="24" fill="#F8FAFC">VT</text>
+  <!-- VT lower half (blue) -->
+  <text clip-path="url(#lower-fav)" font-family="Inter, sans-serif" font-weight="800" font-size="20" text-anchor="middle" x="16" y="24" fill="#3B82F6">VT</text>
+  <!-- Scan line -->
+  <rect x="0" y="15" width="32" height="2" fill="#3B82F6" filter="url(#glow-fav)"/>
+</svg>
