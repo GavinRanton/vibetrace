@@ -33,14 +33,15 @@ export async function GET() {
     );
 
     const {
-      data: { session },
-    } = await authClient.auth.getSession();
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser();
 
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Service-role client — used for all DB queries
     const db = createServerClient(

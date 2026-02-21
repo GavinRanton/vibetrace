@@ -159,10 +159,11 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const { data: { session } } = await supabase.auth.getSession();
 
     const body = await request.json();
     const { repo_id, repo_full_name, deployed_url } = body;
@@ -171,19 +172,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Provide a repository or deployed URL" }, { status: 400 });
     }
 
-    const githubToken = session.provider_token;
+    const githubToken = session?.provider_token ?? null;
     if (!githubToken && repo_id) {
       return NextResponse.json({ error: "No GitHub token — please re-authenticate" }, { status: 401 });
     }
 
     // Check plan limits
-    const { data: user } = await adminClient
+    const { data: userRecord } = await adminClient
       .from("users")
       .select("plan, scan_count")
-      .eq("id", session.user.id)
+      .eq("id", user.id)
       .single();
 
-    if (user?.plan === "free" && user?.scan_count >= 1) {
+    if (userRecord?.plan === "free" && userRecord?.scan_count >= 1) {
       return NextResponse.json({ error: "Free plan limit reached. Upgrade to scan more." }, { status: 403 });
     }
 
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
       const { data: repoRecord, error: repoError } = await adminClient
         .from("repos")
         .upsert({
-          user_id: session.user.id,
+          user_id: user.id,
           github_repo_id: String(repo_id),
           name: repo_full_name.split("/")[1],
           full_name: repo_full_name,
@@ -214,7 +215,7 @@ export async function POST(request: NextRequest) {
       .from("scans")
       .insert({
         repo_id: repoUuid,
-        user_id: session.user.id,
+        user_id: user.id,
         status: "cloning",
         started_at: new Date().toISOString(),
       })
@@ -227,7 +228,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Run scan asynchronously (respond immediately, process in background)
-    processScan(scan.id, repo_full_name ?? null, githubToken ?? null, session.user.id, repoUuid, deployed_url);
+    processScan(scan.id, repo_full_name ?? null, githubToken ?? null, user.id, repoUuid, deployed_url);
 
     return NextResponse.json({ scan_id: scan.id, status: "started" });
   } catch (error: any) {
