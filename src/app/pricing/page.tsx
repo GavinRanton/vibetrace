@@ -91,9 +91,7 @@ export default function PricingPage() {
       {/* Nav */}
       <nav className="border-b border-white/5 px-6 py-4 flex items-center justify-between sticky top-0 z-50 bg-[#0A0A0F]/80 backdrop-blur-xl">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-[#3B82F6] flex items-center justify-center">
-            <span className="text-xs font-bold">VT</span>
-          </div>
+          <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-7 h-7" />
           <span className="font-semibold">VibeTrace</span>
         </Link>
         <div className="flex items-center gap-3">
@@ -123,14 +121,14 @@ export default function PricingPage() {
           <span className={`text-sm ${!annual ? "text-white" : "text-white/40"}`}>Monthly</span>
           <button
             onClick={() => setAnnual(!annual)}
-            className={`relative w-12 h-6 rounded-full transition-colors ${annual ? "bg-[#3B82F6]" : "bg-white/10"}`}
+            className={`relative flex h-6 w-12 items-center rounded-full transition-colors duration-200 ${annual ? "bg-[#3B82F6]" : "bg-white/20"}`}
             aria-label="Toggle annual billing"
             data-testid="pricing-toggle"
             role="switch"
             aria-checked={annual}
           >
             <span
-              className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${annual ? "translate-x-7" : "translate-x-1"}`}
+              className={`h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-200 ${annual ? "ml-7" : "ml-1"}`}
             />
           </button>
           <span className={`text-sm ${annual ? "text-white" : "text-white/40"}`}>Annual</span>

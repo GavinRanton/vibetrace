@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from "next/link";
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -11,16 +11,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ChevronUp, ChevronDown, ShieldCheck, User, LogOut } from "lucide-react";
 
-const scansUsed = 3;
-const scansTotal = 5;
+type Finding = {
+  id: string;
+  severity: string;
+  category: string;
+  file_path: string;
+  plain_english: string;
+  fix_prompt: string;
+  status: string;
+  created_at: string;
+};
 
-const mockIssues = [
-  { id: 1, severity: "critical", title: "SQL Injection in /api/users", file: "src/api/users.ts:142", cve: "CVE-2024-1234", discovered: "2h ago" },
-  { id: 2, severity: "high", title: "Prototype Pollution in lodash", file: "node_modules/lodash", cve: "CVE-2019-10744", discovered: "2h ago" },
-  { id: 3, severity: "high", title: "XSS via unsanitized input", file: "src/components/Search.tsx:67", cve: null, discovered: "1d ago" },
-  { id: 4, severity: "medium", title: "Insecure JWT algorithm", file: "src/lib/auth.ts:23", cve: null, discovered: "3d ago" },
-  { id: 5, severity: "low", title: "Missing HSTS header", file: "next.config.js", cve: null, discovered: "5d ago" },
-];
+type DashboardData = {
+  plan: string;
+  scan_count: number;
+  scans_limit: number;
+  findings: Finding[];
+  severity_counts: { critical: number; high: number; medium: number; low: number };
+  last_scan_at: string | null;
+};
 
 const severityConfig: Record<string, { color: string; bg: string; label: string }> = {
   critical: { color: "#EF4444", bg: "rgba(239,68,68,0.1)", label: "Critical" },
@@ -47,6 +56,91 @@ function handleSignOut() {
   })
 }
 
+function IssuesTable({ findings }: { findings: Finding[] }) {
+  return (
+    <Card className="bg-white/[0.02] border-white/5">
+      <CardContent className="p-0">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-[100px]" />
+            <col className="w-auto" style={{ minWidth: "250px" }} />
+            <col className="w-[200px]" />
+            <col className="w-[140px]" />
+            <col className="w-[120px]" />
+            <col className="w-[80px]" />
+          </colgroup>
+          <thead>
+            <tr className="border-b border-white/5 text-white/40">
+              <th className="text-left px-6 py-3 font-medium w-[100px]">
+                <SortHeader>Severity</SortHeader>
+              </th>
+              <th className="text-left px-6 py-3 font-medium" style={{ minWidth: "250px" }}>
+                <SortHeader>Issue</SortHeader>
+              </th>
+              <th className="text-left px-6 py-3 font-medium w-[200px]">
+                <SortHeader>Location</SortHeader>
+              </th>
+              <th className="text-left px-6 py-3 font-medium w-[140px]">
+                <SortHeader>CVE</SortHeader>
+              </th>
+              <th className="text-left px-6 py-3 font-medium w-[120px]">
+                <SortHeader>Discovered</SortHeader>
+              </th>
+              <th className="text-left px-6 py-3 font-medium w-[80px]">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {findings.map((issue) => {
+              const cfg = severityConfig[issue.severity] ?? severityConfig['low'];
+              return (
+                <tr key={issue.id} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+                  <td className="px-6 py-4 w-[100px]">
+                    <Badge
+                      style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}30` }}
+                    >
+                      {cfg.label}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 text-white/80 font-medium" style={{ minWidth: "250px" }}>{issue.plain_english}</td>
+                  <td className="px-6 py-4 text-white/40 font-mono text-xs w-[200px] truncate overflow-hidden max-w-[200px]">{issue.file_path}</td>
+                  <td className="px-6 py-4 w-[140px] whitespace-nowrap">
+                    <span className="text-white/20 text-xs">—</span>
+                  </td>
+                  <td className="px-6 py-4 w-[120px] text-white/40 text-xs whitespace-nowrap">
+                    {new Date(issue.created_at).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 w-[80px]">
+                    <Button size="sm" variant="ghost" className="text-[#3B82F6] hover:text-[#60A5FA] h-7 text-xs">
+                      Fix →
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <Card className="bg-white/[0.02] border-white/5">
+      <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
+        <ShieldCheck className="w-12 h-12 text-[#10B981]" />
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-white mb-1">No scans yet</h3>
+          <p className="text-white/40 text-sm">{message}</p>
+        </div>
+        <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white mt-2" asChild>
+          <Link href="/scan">New Scan</Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CheckoutBanner() {
   const searchParams = useSearchParams();
   const checkoutSuccess = searchParams.get('checkout') === 'success';
@@ -59,8 +153,50 @@ function CheckoutBanner() {
 }
 
 export default function DashboardPage() {
-  const scanPct = (scansUsed / scansTotal) * 100;
-  const lowOnScans = scansUsed > 3;
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/dashboard')
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch');
+        return res.json();
+      })
+      .then((json) => {
+        setData(json);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
+        <div>Failed to load dashboard</div>
+      </div>
+    );
+  }
+
+  const scanPct = (data.scan_count / data.scans_limit) * 100;
+  const lowOnScans = data.scan_count > data.scans_limit * 0.6;
+  const planLabel = data.plan === 'free'
+    ? 'Free plan'
+    : data.plan.charAt(0).toUpperCase() + data.plan.slice(1) + ' plan';
+
+  const criticalFindings = data.findings.filter(f => f.severity === 'critical');
+  const dependencyFindings = data.findings.filter(f => f.category === 'dependency');
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white">
@@ -74,18 +210,13 @@ export default function DashboardPage() {
         {/* Sidebar */}
         <aside className="w-56 border-r border-white/5 flex flex-col p-4 shrink-0">
           <div className="flex items-center gap-2 mb-8 px-2">
-            <div className="w-7 h-7 rounded-md bg-[#3B82F6] flex items-center justify-center">
-              <span className="text-xs font-bold">VT</span>
-            </div>
-            <span className="font-semibold">VibeTrace</span>
+            <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-7 h-7" />
+            <Link href="/dashboard" className="font-semibold hover:text-white/80 transition-colors">VibeTrace</Link>
           </div>
           <nav className="flex flex-col gap-1 text-sm">
             {[
               { label: "Dashboard", href: "/dashboard", active: true },
               { label: "New Scan", href: "/scan", active: false },
-              { label: "Repositories", href: "/dashboard", active: false },
-              { label: "Reports", href: "/dashboard", active: false },
-              { label: "Settings", href: "/dashboard", active: false },
             ].map((item) => (
               <Link
                 key={item.label}
@@ -99,6 +230,26 @@ export default function DashboardPage() {
                 {item.label}
               </Link>
             ))}
+            {/* TODO: /repositories */}
+            <Link
+              href="/dashboard"
+              className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
+            >
+              Repositories
+            </Link>
+            {/* TODO: /reports */}
+            <Link
+              href="/dashboard"
+              className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
+            >
+              Reports
+            </Link>
+            <Link
+              href="/account"
+              className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
+            >
+              Settings
+            </Link>
             <Link
               href="/account"
               className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2"
@@ -110,8 +261,8 @@ export default function DashboardPage() {
           <div className="mt-auto">
             <Separator className="bg-white/5 mb-4" />
             <div className="px-3 py-2 rounded-md bg-white/[0.03] text-xs text-white/40 mb-3">
-              <div className="font-medium text-white/70 mb-1">Free plan</div>
-              <div>{scansUsed} / {scansTotal} scans used</div>
+              <div className="font-medium text-white/70 mb-1">{planLabel}</div>
+              <div>{data.scan_count} / {data.scans_limit} scans used</div>
               <Progress value={scanPct} className="mt-2 h-1" />
               {lowOnScans && (
                 <p className="mt-1.5 text-[#F59E0B]">Running low — upgrade for unlimited scans</p>
@@ -135,7 +286,9 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-2xl font-bold">Security Overview</h1>
-              <p className="text-white/40 text-sm mt-1">Last scan: 2 hours ago · my-app-repo</p>
+              <p className="text-white/40 text-sm mt-1">
+                {data?.last_scan_at ? `Last scan: ${new Date(data.last_scan_at).toLocaleDateString()}` : 'No scans yet'}
+              </p>
             </div>
             <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white" asChild>
               <Link href="/scan">+ New Scan</Link>
@@ -145,10 +298,10 @@ export default function DashboardPage() {
           {/* Stats grid */}
           <div className="grid grid-cols-4 gap-4 mb-8">
             {[
-              { label: "Critical", value: "1", color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
-              { label: "High", value: "2", color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
-              { label: "Medium", value: "1", color: "#3B82F6", bg: "rgba(59,130,246,0.1)" },
-              { label: "Low", value: "1", color: "#10B981", bg: "rgba(16,185,129,0.1)" },
+              { label: "Critical", value: data.severity_counts.critical, color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
+              { label: "High", value: data.severity_counts.high, color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
+              { label: "Medium", value: data.severity_counts.medium, color: "#3B82F6", bg: "rgba(59,130,246,0.1)" },
+              { label: "Low", value: data.severity_counts.low, color: "#10B981", bg: "rgba(16,185,129,0.1)" },
             ].map((stat) => (
               <Card key={stat.label} className="bg-white/[0.02] border-white/5">
                 <CardHeader className="pb-2">
@@ -173,92 +326,25 @@ export default function DashboardPage() {
               <TabsTrigger value="dependencies" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">Dependencies</TabsTrigger>
             </TabsList>
             <TabsContent value="all">
-              {mockIssues.length === 0 ? (
-                <Card className="bg-white/[0.02] border-white/5">
-                  <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
-                    <ShieldCheck className="w-12 h-12 text-[#10B981]" />
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold text-white mb-1">No vulnerabilities found</h3>
-                      <p className="text-white/40 text-sm">Your code looks clean. Run another scan to stay secure.</p>
-                    </div>
-                    <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white mt-2" asChild>
-                      <Link href="/scan">New Scan</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
+              {data.findings.length === 0 ? (
+                <EmptyState message="Run your first scan to see security findings." />
               ) : (
-                <Card className="bg-white/[0.02] border-white/5">
-                  <CardContent className="p-0">
-                    <table className="w-full text-sm table-fixed">
-                      <colgroup>
-                        <col className="w-[100px]" />
-                        <col className="w-auto" style={{ minWidth: "250px" }} />
-                        <col className="w-[200px]" />
-                        <col className="w-[140px]" />
-                        <col className="w-[120px]" />
-                        <col className="w-[80px]" />
-                      </colgroup>
-                      <thead>
-                        <tr className="border-b border-white/5 text-white/40">
-                          <th className="text-left px-6 py-3 font-medium w-[100px]">
-                            <SortHeader>Severity</SortHeader>
-                          </th>
-                          <th className="text-left px-6 py-3 font-medium" style={{ minWidth: "250px" }}>
-                            <SortHeader>Issue</SortHeader>
-                          </th>
-                          <th className="text-left px-6 py-3 font-medium w-[200px]">
-                            <SortHeader>Location</SortHeader>
-                          </th>
-                          <th className="text-left px-6 py-3 font-medium w-[140px]">
-                            <SortHeader>CVE</SortHeader>
-                          </th>
-                          <th className="text-left px-6 py-3 font-medium w-[120px]">
-                            <SortHeader>Discovered</SortHeader>
-                          </th>
-                          <th className="text-left px-6 py-3 font-medium w-[80px]">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {mockIssues.map((issue) => {
-                          const cfg = severityConfig[issue.severity];
-                          return (
-                            <tr key={issue.id} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
-                              <td className="px-6 py-4 w-[100px]">
-                                <Badge
-                                  style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}30` }}
-                                >
-                                  {cfg.label}
-                                </Badge>
-                              </td>
-                              <td className="px-6 py-4 text-white/80 font-medium" style={{ minWidth: "250px" }}>{issue.title}</td>
-                              <td className="px-6 py-4 text-white/40 font-mono text-xs w-[200px] truncate overflow-hidden max-w-[200px]">{issue.file}</td>
-                              <td className="px-6 py-4 w-[140px] whitespace-nowrap">
-                                {issue.cve ? (
-                                  <span className="text-[#3B82F6] text-xs font-mono">{issue.cve}</span>
-                                ) : (
-                                  <span className="text-white/20 text-xs">—</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 w-[120px] text-white/40 text-xs whitespace-nowrap">{issue.discovered}</td>
-                              <td className="px-6 py-4 w-[80px]">
-                                <Button size="sm" variant="ghost" className="text-[#3B82F6] hover:text-[#60A5FA] h-7 text-xs">
-                                  Fix →
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </CardContent>
-                </Card>
+                <IssuesTable findings={data.findings} />
               )}
             </TabsContent>
             <TabsContent value="critical">
-              <div className="text-white/40 text-center py-8">Showing critical issues only</div>
+              {criticalFindings.length === 0 ? (
+                <div className="text-white/40 text-center py-8">No critical issues found.</div>
+              ) : (
+                <IssuesTable findings={criticalFindings} />
+              )}
             </TabsContent>
             <TabsContent value="dependencies">
-              <div className="text-white/40 text-center py-8">Showing dependency vulnerabilities</div>
+              {dependencyFindings.length === 0 ? (
+                <div className="text-white/40 text-center py-8">No dependency issues found.</div>
+              ) : (
+                <IssuesTable findings={dependencyFindings} />
+              )}
             </TabsContent>
           </Tabs>
         </main>

@@ -43,6 +43,37 @@ export function AuthCard({ mode }: AuthCardProps) {
     return valid;
   }
 
+  async function handleGitHubSignIn() {
+    setLoading(true);
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: "repo:status read:user user:email",
+      },
+    });
+    if (error) {
+      setAuthError(error.message);
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setLoading(true);
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) {
+      setAuthError(error.message);
+      setLoading(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
@@ -89,7 +120,7 @@ export function AuthCard({ mode }: AuthCardProps) {
         {/* GitHub Button */}
         <button
           type="button"
-          onClick={() => (window.location.href = "/api/auth/github")}
+          onClick={handleGitHubSignIn}
           className="flex items-center justify-center gap-2 h-11 w-full rounded-lg bg-[#3B82F6] hover:bg-[#2563EB] text-white font-semibold text-sm transition-colors"
         >
           <Github size={24} />
@@ -106,7 +137,7 @@ export function AuthCard({ mode }: AuthCardProps) {
         {/* Google Button */}
         <button
           type="button"
-          onClick={() => (window.location.href = "/api/auth/google")}
+          onClick={handleGoogleSignIn}
           className="bg-white text-gray-900 border border-gray-200 h-11 w-full rounded-lg font-semibold text-sm flex items-center justify-center gap-3 hover:bg-gray-50 transition-colors"
         >
           <svg width="18" height="18" viewBox="0 0 18 18">

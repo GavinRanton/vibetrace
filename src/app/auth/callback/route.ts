@@ -32,5 +32,6 @@ export async function GET(request: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  return NextResponse.redirect(`${origin}/dashboard`);
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
+  return NextResponse.redirect(`${appUrl}/dashboard`);
 }

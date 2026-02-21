@@ -6,9 +6,7 @@ export default function PrivacyPage() {
       {/* Nav */}
       <nav className="border-b border-white/5 px-6 py-4 flex items-center justify-between sticky top-0 z-50 bg-[#0A0A0F]/80 backdrop-blur-xl">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-[#3B82F6] flex items-center justify-center">
-            <span className="text-xs font-bold text-white">VT</span>
-          </div>
+          <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-7 h-7" />
           <span className="font-semibold text-[#F8FAFC]">VibeTrace</span>
         </Link>
       </nav>
