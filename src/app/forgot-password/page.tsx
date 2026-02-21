@@ -43,9 +43,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md bg-[#1E1E2E] rounded-2xl p-8 flex flex-col gap-6">
         {/* Logo */}
         <div className="flex justify-center">
-          <div className="w-10 h-10 rounded-xl bg-[#3B82F6] flex items-center justify-center">
-            <span className="font-bold text-white text-sm">VT</span>
-          </div>
+          <img src="/branding/logo-icon-white.svg" alt="VibeTrace" className="w-10 h-10" />
         </div>
 
         <h1 className="text-[#F8FAFC] text-xl font-semibold text-center">
