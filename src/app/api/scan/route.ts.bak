@@ -167,12 +167,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { repo_id, repo_full_name, deployed_url } = body;
 
-    if (!repo_id && !deployed_url) {
-      return NextResponse.json({ error: "Provide a repository or deployed URL" }, { status: 400 });
+    if (!repo_id || !repo_full_name) {
+      return NextResponse.json({ error: "Missing repo_id or repo_full_name" }, { status: 400 });
     }
 
     const githubToken = session.provider_token;
-    if (!githubToken && repo_id) {
+    if (!githubToken) {
       return NextResponse.json({ error: "No GitHub token — please re-authenticate" }, { status: 401 });
     }
 
@@ -187,33 +187,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Free plan limit reached. Upgrade to scan more." }, { status: 403 });
     }
 
-    // Upsert repo record to get internal UUID (only when a repo is provided)
-    let repoUuid: string | null = null;
-    if (repo_id && repo_full_name) {
-      const { data: repoRecord, error: repoError } = await adminClient
-        .from("repos")
-        .upsert({
-          user_id: session.user.id,
-          github_repo_id: String(repo_id),
-          name: repo_full_name.split("/")[1],
-          full_name: repo_full_name,
-        }, { onConflict: "user_id,github_repo_id" })
-        .select("id")
-        .single();
+    // Upsert repo record to get internal UUID (scans.repo_id is UUID FK, not GitHub int)
+    const { data: repoRecord, error: repoError } = await adminClient
+      .from("repos")
+      .upsert({
+        user_id: session.user.id,
+        github_repo_id: String(repo_id),
+        name: repo_full_name.split("/")[1],
+        full_name: repo_full_name,
+      }, { onConflict: "user_id,github_repo_id" })
+      .select("id")
+      .single();
 
-      if (repoError || !repoRecord) {
-        console.error("Failed to upsert repo:", repoError);
-        return NextResponse.json({ error: "Failed to register repository" }, { status: 500 });
-      }
-
-      repoUuid = repoRecord.id;
+    if (repoError || !repoRecord) {
+      console.error("Failed to upsert repo:", repoError);
+      return NextResponse.json({ error: "Failed to register repository" }, { status: 500 });
     }
 
-    // Create scan record using internal UUID (null for URL-only scans)
+    // Create scan record using internal UUID
     const { data: scan, error: scanError } = await adminClient
       .from("scans")
       .insert({
-        repo_id: repoUuid,
+        repo_id: repoRecord.id,
         user_id: session.user.id,
         status: "cloning",
         started_at: new Date().toISOString(),
@@ -227,7 +222,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Run scan asynchronously (respond immediately, process in background)
-    processScan(scan.id, repo_full_name ?? null, githubToken ?? null, session.user.id, repoUuid, deployed_url);
+    processScan(scan.id, repo_full_name, githubToken, session.user.id, repoRecord.id, deployed_url);
 
     return NextResponse.json({ scan_id: scan.id, status: "started" });
   } catch (error: any) {
@@ -238,63 +233,55 @@ export async function POST(request: NextRequest) {
 
 async function processScan(
   scanId: string,
-  repoFullName: string | null,
-  githubToken: string | null,
+  repoFullName: string,
+  githubToken: string,
   userId: string,
-  repoIdUuid: string | null,
+  repoIdUuid: string,
   deployedUrl?: string
 ) {
   let repoPath: string | null = null;
-  const mappedFindings: any[] = [];
 
   try {
-    if (repoIdUuid && repoFullName && githubToken) {
-      // Clone repo
-      await adminClient.from("scans").update({ status: "cloning" }).eq("id", scanId);
-      repoPath = await cloneRepo(repoFullName, githubToken);
+    // Clone repo
+    await adminClient.from("scans").update({ status: "cloning" }).eq("id", scanId);
+    repoPath = await cloneRepo(repoFullName, githubToken);
 
-      // Run Semgrep
-      await adminClient.from("scans").update({ status: "scanning" }).eq("id", scanId);
-      const scanResult = await runSemgrepScan(repoPath);
+    // Run Semgrep
+    await adminClient.from("scans").update({ status: "scanning" }).eq("id", scanId);
+    const scanResult = await runSemgrepScan(repoPath);
 
-      // Translate findings with Claude
-      await adminClient.from("scans").update({ status: "translating" }).eq("id", scanId);
-      const translations = await translateFindings(
-        scanResult.findings,
-        process.env.ANTHROPIC_API_KEY || ""
-      );
+    // Translate findings with Claude
+    await adminClient.from("scans").update({ status: "translating" }).eq("id", scanId);
+    const translations = await translateFindings(
+      scanResult.findings,
+      process.env.ANTHROPIC_API_KEY || ""
+    );
 
-      // Map and insert findings
-      const semgrepFindings = scanResult.findings.map((f) => {
-        const key = `${f.path}:${f.start.line}:${f.check_id}`;
-        const translation = translations.get(key);
-        const severity = mapSeverity(f.extra.severity);
+    // Map and insert findings
+    const mappedFindings = scanResult.findings.map((f) => {
+      const key = `${f.path}:${f.start.line}:${f.check_id}`;
+      const translation = translations.get(key);
+      const severity = mapSeverity(f.extra.severity);
 
-        return {
-          scan_id: scanId,
-          severity,
-          category: categoriseFinding(f.check_id),
-          rule_id: f.check_id,
-          file_path: f.path,
-          line_number: f.start.line,
-          code_snippet: f.extra.lines,
-          raw_output: f,
-          plain_english: translation?.plain_english || f.extra.message,
-          business_impact: translation?.business_impact || `${severity} severity finding`,
-          fix_prompt: translation?.fix_prompt || `Fix the issue in ${f.path} at line ${f.start.line}`,
-          verification_step: translation?.verification_step || "Re-run the scan to verify the fix",
-          status: "open",
-        };
-      });
+      return {
+        scan_id: scanId,
+        severity,
+        category: categoriseFinding(f.check_id),
+        rule_id: f.check_id,
+        file_path: f.path,
+        line_number: f.start.line,
+        code_snippet: f.extra.lines,
+        raw_output: f,
+        plain_english: translation?.plain_english || f.extra.message,
+        business_impact: translation?.business_impact || `${severity} severity finding`,
+        fix_prompt: translation?.fix_prompt || `Fix the issue in ${f.path} at line ${f.start.line}`,
+        verification_step: translation?.verification_step || "Re-run the scan to verify the fix",
+        status: "open",
+      };
+    });
 
-      if (semgrepFindings.length > 0) {
-        await adminClient.from("findings").insert(semgrepFindings);
-      }
-
-      mappedFindings.push(...semgrepFindings);
-    } else {
-      // URL-only scan — go straight to DAST
-      await adminClient.from("scans").update({ status: "scanning" }).eq("id", scanId);
+    if (mappedFindings.length > 0) {
+      await adminClient.from("findings").insert(mappedFindings);
     }
 
     // Run ZAP DAST scan if a deployed URL was provided
@@ -320,16 +307,15 @@ async function processScan(
       high_count: counts.high,
       medium_count: counts.medium,
       low_count: counts.low,
+      duration_seconds: Math.round(scanResult.duration / 1000),
       completed_at: new Date().toISOString(),
     }).eq("id", scanId);
 
     // Update user scan count
     await adminClient.rpc("increment_scan_count", { user_id: userId });
 
-    // Update repo last scanned (only when a repo is involved)
-    if (repoIdUuid) {
-      await adminClient.from("repos").update({ last_scanned_at: new Date().toISOString() }).eq("id", repoIdUuid);
-    }
+    // Update repo last scanned
+    await adminClient.from("repos").update({ last_scanned_at: new Date().toISOString() }).eq("id", repoIdUuid);
 
     // Send email notification to user
     try {
@@ -341,7 +327,7 @@ async function processScan(
       if (userRecord?.email) {
         await sendScanCompleteEmail(userRecord.email, {
           scan_id: scanId,
-          repo_name: repoFullName ?? deployedUrl ?? "URL scan",
+          repo_name: repoFullName,
           score,
           total_findings: mappedFindings.length,
           critical_count: counts.critical,

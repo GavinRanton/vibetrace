@@ -83,6 +83,8 @@ export default function ScanPage() {
   };
 
   const handleScan = async () => {
+    if (!selectedRepo) return;
+
     if (deployedUrl && !deployedUrl.startsWith("https://")) {
       setUrlError("URL must start with https://");
       return;
@@ -96,8 +98,8 @@ export default function ScanPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          repo_id: selectedRepo?.id ?? null,
-          repo_full_name: selectedRepo?.full_name ?? null,
+          repo_id: selectedRepo.id,
+          repo_full_name: selectedRepo.full_name,
           deployed_url: deployedUrl || undefined,
         }),
       });
@@ -258,20 +260,10 @@ export default function ScanPage() {
                   )}
                 </div>
 
-                {/* URL-only hint */}
-                {!selectedRepo && deployedUrl && (
-                  <p className="text-xs text-white/40 mt-2 text-center">
-                    No repo selected — URL-only scan will run DAST only
-                  </p>
-                )}
-
                 {/* Deployed URL input */}
                 <div className="mt-4 space-y-1">
                   <label className="text-sm text-white/60 font-medium">
-                    Deployed URL{" "}
-                    <span className="text-white/30 font-normal">
-                      (optional with repo / required without)
-                    </span>
+                    Deployed URL <span className="text-white/30 font-normal">(optional)</span>
                   </label>
                   <p className="text-xs text-white/30">We&apos;ll scan your live site for runtime vulnerabilities</p>
                   <Input
@@ -289,7 +281,7 @@ export default function ScanPage() {
                 {/* Scan button */}
                 <Button
                   onClick={handleScan}
-                  disabled={!selectedRepo && (!deployedUrl || !deployedUrl.startsWith("https://"))}
+                  disabled={!selectedRepo}
                   className="w-full bg-[#3B82F6] hover:bg-[#2563EB] text-white disabled:opacity-40"
                 >
                   Scan Now →
@@ -311,18 +303,16 @@ export default function ScanPage() {
           )}
 
           {/* Scanning state */}
-          {pageState === "scanning" && (
+          {pageState === "scanning" && selectedRepo && (
             <Card className="bg-white/[0.02] border-white/5">
               <CardContent className="p-10 flex flex-col items-center justify-center gap-4">
                 <Loader2 className="w-10 h-10 text-[#3B82F6] animate-spin" />
                 <div className="text-center">
                   <p className="text-white/80 font-medium">
-                    Scanning {selectedRepo ? selectedRepo.full_name : deployedUrl}…
+                    Scanning {selectedRepo.full_name}…
                   </p>
                   <p className="text-white/30 text-sm mt-1">This may take a moment.</p>
-                  {selectedRepo && deployedUrl && (
-                    <p className="text-white/30 text-xs mt-1">+ scanning {deployedUrl}</p>
-                  )}
+                  {deployedUrl && <p className="text-white/30 text-xs mt-1">+ scanning {deployedUrl}</p>}
                 </div>
               </CardContent>
             </Card>

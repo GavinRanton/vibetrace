@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ChevronUp, ChevronDown, ShieldCheck, User, LogOut } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ChevronUp, ChevronDown, ShieldCheck, User, LogOut, Menu } from "lucide-react";
 
 type Finding = {
   id: string;
@@ -159,6 +160,89 @@ function CheckoutBanner() {
   );
 }
 
+function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans }: {
+  planLabel: string;
+  scanCount: number;
+  scansLimit: number;
+  scanPct: number;
+  lowOnScans: boolean;
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-8 px-2">
+        <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-7 h-7" />
+        <Link href="/dashboard" className="font-semibold hover:text-white/80 transition-colors">VibeTrace</Link>
+      </div>
+      <nav className="flex flex-col gap-1 text-sm">
+        {[
+          { label: "Dashboard", href: "/dashboard", active: true },
+          { label: "New Scan", href: "/scan", active: false },
+        ].map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={`px-3 py-2 rounded-md transition-colors ${
+              item.active
+                ? "bg-[#3B82F6]/10 text-[#3B82F6]"
+                : "text-white/50 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            {item.label}
+          </Link>
+        ))}
+        {/* TODO: /repositories */}
+        <Link
+          href="/dashboard"
+          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
+        >
+          Repositories
+        </Link>
+        {/* TODO: /reports */}
+        <Link
+          href="/dashboard"
+          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
+        >
+          Reports
+        </Link>
+        <Link
+          href="/account"
+          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
+        >
+          Settings
+        </Link>
+        <Link
+          href="/account"
+          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2"
+        >
+          <User className="w-4 h-4" />
+          Account
+        </Link>
+      </nav>
+      <div className="mt-auto">
+        <Separator className="bg-white/5 mb-4" />
+        <div className="px-3 py-2 rounded-md bg-white/[0.03] text-xs text-white/40 mb-3">
+          <div className="font-medium text-white/70 mb-1">{planLabel}</div>
+          <div>{scanCount} / {scansLimit} scans used</div>
+          <Progress value={scanPct} className="mt-2 h-1" />
+          {lowOnScans && (
+            <p className="mt-1.5 text-[#F59E0B]">Running low — upgrade for unlimited scans</p>
+          )}
+          <Link href="/pricing" className="mt-2 inline-block text-[#3B82F6] text-xs hover:underline">
+            Upgrade →
+          </Link>
+        </div>
+        <button
+          onClick={handleSignOut}
+          className="w-full px-3 py-2 rounded-md text-sm text-white/40 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign out
+        </button>
+      </div>
+    </>
+  );
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -205,6 +289,14 @@ export default function DashboardPage() {
   const criticalFindings = data.findings.filter(f => f.severity === 'critical');
   const dependencyFindings = data.findings.filter(f => f.category === 'dependency');
 
+  const sidebarProps = {
+    planLabel,
+    scanCount: data.scan_count,
+    scansLimit: data.scans_limit,
+    scanPct,
+    lowOnScans,
+  };
+
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white">
       {/* Checkout success banner */}
@@ -213,148 +305,100 @@ export default function DashboardPage() {
       </Suspense>
 
       {/* Sidebar + Main layout */}
-      <div className="flex h-screen">
-        {/* Sidebar */}
-        <aside className="w-56 border-r border-white/5 flex flex-col p-4 shrink-0">
-          <div className="flex items-center gap-2 mb-8 px-2">
-            <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-7 h-7" />
-            <Link href="/dashboard" className="font-semibold hover:text-white/80 transition-colors">VibeTrace</Link>
-          </div>
-          <nav className="flex flex-col gap-1 text-sm">
-            {[
-              { label: "Dashboard", href: "/dashboard", active: true },
-              { label: "New Scan", href: "/scan", active: false },
-            ].map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`px-3 py-2 rounded-md transition-colors ${
-                  item.active
-                    ? "bg-[#3B82F6]/10 text-[#3B82F6]"
-                    : "text-white/50 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-            {/* TODO: /repositories */}
-            <Link
-              href="/dashboard"
-              className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-            >
-              Repositories
-            </Link>
-            {/* TODO: /reports */}
-            <Link
-              href="/dashboard"
-              className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-            >
-              Reports
-            </Link>
-            <Link
-              href="/account"
-              className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-            >
-              Settings
-            </Link>
-            <Link
-              href="/account"
-              className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2"
-            >
-              <User className="w-4 h-4" />
-              Account
-            </Link>
-          </nav>
-          <div className="mt-auto">
-            <Separator className="bg-white/5 mb-4" />
-            <div className="px-3 py-2 rounded-md bg-white/[0.03] text-xs text-white/40 mb-3">
-              <div className="font-medium text-white/70 mb-1">{planLabel}</div>
-              <div>{data.scan_count} / {data.scans_limit} scans used</div>
-              <Progress value={scanPct} className="mt-2 h-1" />
-              {lowOnScans && (
-                <p className="mt-1.5 text-[#F59E0B]">Running low — upgrade for unlimited scans</p>
-              )}
-              <Link href="/pricing" className="mt-2 inline-block text-[#3B82F6] text-xs hover:underline">
-                Upgrade →
-              </Link>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="w-full px-3 py-2 rounded-md text-sm text-white/40 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" />
-              Sign out
-            </button>
-          </div>
+      <div className="flex">
+        {/* Desktop Sidebar — hidden on mobile */}
+        <aside className="hidden md:flex md:w-56 md:fixed md:inset-y-0 border-r border-white/5 flex-col p-4 shrink-0">
+          <SidebarNav {...sidebarProps} />
         </aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-auto p-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-2xl font-bold">Security Overview</h1>
-              <p className="text-white/40 text-sm mt-1">
-                {data?.last_scan_at ? `Last scan: ${new Date(data.last_scan_at).toLocaleDateString()}` : 'No scans yet'}
-              </p>
+        {/* Main content — full width on mobile, offset on desktop */}
+        <div className="md:ml-56 flex-1 flex flex-col min-h-screen">
+          {/* Mobile top nav */}
+          <div className="flex md:hidden items-center justify-between px-4 py-3 border-b border-white/5 bg-[#0A0A0F] sticky top-0 z-40">
+            <div className="flex items-center gap-2">
+              <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-6 h-6" />
+              <span className="font-semibold text-sm">VibeTrace</span>
             </div>
-            <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white" asChild>
-              <Link href="/scan">+ New Scan</Link>
-            </Button>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-white/60">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-56 bg-[#0A0A0F] border-white/5 p-4 flex flex-col">
+                <SidebarNav {...sidebarProps} />
+              </SheetContent>
+            </Sheet>
           </div>
 
-          {/* Stats grid */}
-          <div className="grid grid-cols-4 gap-4 mb-8">
-            {[
-              { label: "Critical", value: data.severity_counts.critical, color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
-              { label: "High", value: data.severity_counts.high, color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
-              { label: "Medium", value: data.severity_counts.medium, color: "#3B82F6", bg: "rgba(59,130,246,0.1)" },
-              { label: "Low", value: data.severity_counts.low, color: "#10B981", bg: "rgba(16,185,129,0.1)" },
-            ].map((stat) => (
-              <Card key={stat.label} className="bg-white/[0.02] border-white/5">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-white/40 uppercase tracking-wider">
-                    {stat.label}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold" style={{ color: stat.color }}>
-                    {stat.value}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {/* Main content */}
+          <main className="flex-1 overflow-auto p-4 md:p-8">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-2xl font-bold">Security Overview</h1>
+                <p className="text-white/40 text-sm mt-1">
+                  {data?.last_scan_at ? `Last scan: ${new Date(data.last_scan_at).toLocaleDateString()}` : 'No scans yet'}
+                </p>
+              </div>
+              <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white" asChild>
+                <Link href="/scan">+ New Scan</Link>
+              </Button>
+            </div>
 
-          {/* Issues table */}
-          <Tabs defaultValue="all">
-            <TabsList className="bg-white/5 border border-white/10 mb-6">
-              <TabsTrigger value="all" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">All Issues</TabsTrigger>
-              <TabsTrigger value="critical" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">Critical</TabsTrigger>
-              <TabsTrigger value="dependencies" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">Dependencies</TabsTrigger>
-            </TabsList>
-            <TabsContent value="all">
-              {data.findings.length === 0 ? (
-                <EmptyState message="Run your first scan to see security findings." />
-              ) : (
-                <IssuesTable findings={data.findings} />
-              )}
-            </TabsContent>
-            <TabsContent value="critical">
-              {criticalFindings.length === 0 ? (
-                <div className="text-white/40 text-center py-8">No critical issues found.</div>
-              ) : (
-                <IssuesTable findings={criticalFindings} />
-              )}
-            </TabsContent>
-            <TabsContent value="dependencies">
-              {dependencyFindings.length === 0 ? (
-                <div className="text-white/40 text-center py-8">No dependency issues found.</div>
-              ) : (
-                <IssuesTable findings={dependencyFindings} />
-              )}
-            </TabsContent>
-          </Tabs>
-        </main>
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: "Critical", value: data.severity_counts.critical, color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
+                { label: "High", value: data.severity_counts.high, color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
+                { label: "Medium", value: data.severity_counts.medium, color: "#3B82F6", bg: "rgba(59,130,246,0.1)" },
+                { label: "Low", value: data.severity_counts.low, color: "#10B981", bg: "rgba(16,185,129,0.1)" },
+              ].map((stat) => (
+                <Card key={stat.label} className="bg-white/[0.02] border-white/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-medium text-white/40 uppercase tracking-wider">
+                      {stat.label}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold" style={{ color: stat.color }}>
+                      {stat.value}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Issues table */}
+            <Tabs defaultValue="all">
+              <TabsList className="bg-white/5 border border-white/10 mb-6">
+                <TabsTrigger value="all" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">All Issues</TabsTrigger>
+                <TabsTrigger value="critical" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">Critical</TabsTrigger>
+                <TabsTrigger value="dependencies" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">Dependencies</TabsTrigger>
+              </TabsList>
+              <TabsContent value="all">
+                {data.findings.length === 0 ? (
+                  <EmptyState message="Run your first scan to see security findings." />
+                ) : (
+                  <IssuesTable findings={data.findings} />
+                )}
+              </TabsContent>
+              <TabsContent value="critical">
+                {criticalFindings.length === 0 ? (
+                  <div className="text-white/40 text-center py-8">No critical issues found.</div>
+                ) : (
+                  <IssuesTable findings={criticalFindings} />
+                )}
+              </TabsContent>
+              <TabsContent value="dependencies">
+                {dependencyFindings.length === 0 ? (
+                  <div className="text-white/40 text-center py-8">No dependency issues found.</div>
+                ) : (
+                  <IssuesTable findings={dependencyFindings} />
+                )}
+              </TabsContent>
+            </Tabs>
+          </main>
+        </div>
       </div>
     </div>
   );
