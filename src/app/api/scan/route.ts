@@ -3,9 +3,14 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { exec as execCb } from "child_process";
+import { promisify } from "util";
+import * as fs from "fs/promises";
 import { cloneRepo, runSemgrepScan, cleanupRepo, mapSeverity, categoriseFinding } from "@/lib/scanner/semgrep";
 import { translateFindings, calculateScore } from "@/lib/scanner/translate";
 import { sendScanCompleteEmail } from "@/lib/email";
+
+const execAsync = promisify(execCb);
 
 // Admin client for writing scan results (bypasses RLS)
 const adminClient = createClient(
@@ -13,6 +18,129 @@ const adminClient = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
+
+function isPrivateUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      /^10\./.test(hostname) ||
+      /^192\.168\./.test(hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      /^169\.254\./.test(hostname) ||
+      /^fc00:/i.test(hostname) ||
+      /^fe80:/i.test(hostname)
+    );
+  } catch {
+    return true; // invalid URL treated as private/unsafe
+  }
+}
+
+async function runZapScan(url: string, scanId: string): Promise<number> {
+  try {
+    if (isPrivateUrl(url)) {
+      console.warn(`[ZAP] Skipping scan — private/internal URL rejected: ${url}`);
+      return 0;
+    }
+
+    const zapWorkDir = "/tmp/zap";
+    const resultsPath = `${zapWorkDir}/results.json`;
+
+    // Ensure work dir exists
+    try {
+      await fs.mkdir(zapWorkDir, { recursive: true });
+    } catch {}
+
+    // Remove stale results file
+    try {
+      await fs.unlink(resultsPath);
+    } catch {}
+
+    const dockerCmd = `docker run --rm -v /tmp/zap:/zap/wrk:rw ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t ${url} -J /zap/wrk/results.json -I`;
+
+    console.log(`[ZAP] Starting baseline scan for: ${url}`);
+
+    try {
+      await Promise.race([
+        execAsync(dockerCmd),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("ZAP scan timed out after 120s")), 120_000)
+        ),
+      ]);
+    } catch (err: any) {
+      if (err.message?.includes("timed out")) {
+        console.warn(`[ZAP] Timeout reached — attempting to read partial results`);
+      } else {
+        // ZAP exits non-zero even on success (when alerts found) — log but continue
+        console.warn(`[ZAP] Docker exited with error (may be normal): ${err.message}`);
+      }
+    }
+
+    // Parse results
+    let raw: string;
+    try {
+      raw = await fs.readFile(resultsPath, "utf-8");
+    } catch {
+      console.warn("[ZAP] No results file found — scan may have failed entirely");
+      return 0;
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      console.warn("[ZAP] Could not parse results.json");
+      return 0;
+    }
+
+    const sites: any[] = parsed?.site ?? [];
+    const alerts: any[] = sites[0]?.alerts ?? [];
+
+    if (alerts.length === 0) {
+      console.log("[ZAP] No alerts found");
+      return 0;
+    }
+
+    const riskMap: Record<string, string> = {
+      "3": "critical",
+      "2": "high",
+      "1": "medium",
+      "0": "low",
+    };
+
+    const findings = alerts.map((alert: any) => ({
+      scan_id: scanId,
+      severity: riskMap[String(alert.riskcode)] ?? "low",
+      category: "dast",
+      rule_id: alert.pluginid ? `zap-${alert.pluginid}` : "zap-unknown",
+      file_path: url,
+      line_number: null,
+      code_snippet: alert.evidence || null,
+      raw_output: alert,
+      plain_english: alert.desc || alert.name || "Security issue detected by DAST scan",
+      business_impact: `${riskMap[String(alert.riskcode)] ?? "low"} severity DAST finding: ${alert.name ?? "Unknown"}`,
+      fix_prompt: alert.solution || `Remediate the ${alert.name ?? "security"} issue found at ${url}`,
+      verification_step: "Re-run the DAST scan against the deployed URL to verify the fix",
+      status: "open",
+    }));
+
+    if (findings.length > 0) {
+      const { error } = await adminClient.from("findings").insert(findings);
+      if (error) {
+        console.error("[ZAP] Failed to insert findings:", error);
+        return 0;
+      }
+    }
+
+    console.log(`[ZAP] Saved ${findings.length} DAST findings for scan ${scanId}`);
+    return findings.length;
+  } catch (err: any) {
+    console.error("[ZAP] runZapScan failed unexpectedly:", err.message);
+    return 0;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,7 +165,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { repo_id, repo_full_name } = body;
+    const { repo_id, repo_full_name, deployed_url } = body;
 
     if (!repo_id || !repo_full_name) {
       return NextResponse.json({ error: "Missing repo_id or repo_full_name" }, { status: 400 });
@@ -76,7 +204,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Run scan asynchronously (respond immediately, process in background)
-    processScan(scan.id, repo_full_name, githubToken, session.user.id);
+    processScan(scan.id, repo_full_name, githubToken, session.user.id, deployed_url);
 
     return NextResponse.json({ scan_id: scan.id, status: "started" });
   } catch (error: any) {
@@ -89,7 +217,8 @@ async function processScan(
   scanId: string,
   repoFullName: string,
   githubToken: string,
-  userId: string
+  userId: string,
+  deployedUrl?: string
 ) {
   let repoPath: string | null = null;
 
@@ -134,6 +263,12 @@ async function processScan(
 
     if (mappedFindings.length > 0) {
       await adminClient.from("findings").insert(mappedFindings);
+    }
+
+    // Run ZAP DAST scan if a deployed URL was provided
+    if (deployedUrl) {
+      await adminClient.from("scans").update({ status: "dast_scanning" }).eq("id", scanId);
+      await runZapScan(deployedUrl, scanId);
     }
 
     // Calculate score and update scan

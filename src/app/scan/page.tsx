@@ -29,6 +29,8 @@ export default function ScanPage() {
   const [search, setSearch] = useState("");
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [deployedUrl, setDeployedUrl] = useState("");
+  const [urlError, setUrlError] = useState("");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -82,6 +84,12 @@ export default function ScanPage() {
 
   const handleScan = async () => {
     if (!selectedRepo) return;
+
+    if (deployedUrl && !deployedUrl.startsWith("https://")) {
+      setUrlError("URL must start with https://");
+      return;
+    }
+
     setPageState("scanning");
     setErrorMessage("");
 
@@ -92,6 +100,7 @@ export default function ScanPage() {
         body: JSON.stringify({
           repo_id: selectedRepo.id,
           repo_full_name: selectedRepo.full_name,
+          deployed_url: deployedUrl || undefined,
         }),
       });
 
@@ -251,6 +260,24 @@ export default function ScanPage() {
                   )}
                 </div>
 
+                {/* Deployed URL input */}
+                <div className="mt-4 space-y-1">
+                  <label className="text-sm text-white/60 font-medium">
+                    Deployed URL <span className="text-white/30 font-normal">(optional)</span>
+                  </label>
+                  <p className="text-xs text-white/30">We&apos;ll scan your live site for runtime vulnerabilities</p>
+                  <Input
+                    value={deployedUrl}
+                    onChange={(e) => {
+                      setDeployedUrl(e.target.value);
+                      setUrlError("");
+                    }}
+                    placeholder="https://your-app.vercel.app"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 font-mono"
+                  />
+                  {urlError && <p className="text-xs text-red-400">{urlError}</p>}
+                </div>
+
                 {/* Scan button */}
                 <Button
                   onClick={handleScan}
@@ -285,6 +312,7 @@ export default function ScanPage() {
                     Scanning {selectedRepo.full_name}…
                   </p>
                   <p className="text-white/30 text-sm mt-1">This may take a moment.</p>
+                  {deployedUrl && <p className="text-white/30 text-xs mt-1">+ scanning {deployedUrl}</p>}
                 </div>
               </CardContent>
             </Card>

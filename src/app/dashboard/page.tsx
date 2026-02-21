@@ -101,7 +101,14 @@ function IssuesTable({ findings }: { findings: Finding[] }) {
                       {cfg.label}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 text-white/80 font-medium" style={{ minWidth: "250px" }}>{issue.plain_english}</td>
+                  <td className="px-6 py-4 text-white/80 font-medium" style={{ minWidth: "250px" }}>
+                    <span className="inline-flex items-center gap-1 flex-wrap">
+                      {issue.plain_english}
+                      {issue.category === 'dast' && (
+                        <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">DAST</span>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-white/40 font-mono text-xs w-[200px] truncate overflow-hidden max-w-[200px]">{issue.file_path}</td>
                   <td className="px-6 py-4 w-[140px] whitespace-nowrap">
                     <span className="text-white/20 text-xs">—</span>
