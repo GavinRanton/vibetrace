@@ -187,11 +187,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Free plan limit reached. Upgrade to scan more." }, { status: 403 });
     }
 
-    // Create scan record
+    // Upsert repo record to get internal UUID (scans.repo_id is UUID FK, not GitHub int)
+    const { data: repoRecord, error: repoError } = await adminClient
+      .from("repos")
+      .upsert({
+        user_id: session.user.id,
+        github_repo_id: String(repo_id),
+        name: repo_full_name.split("/")[1],
+        full_name: repo_full_name,
+      }, { onConflict: "user_id,github_repo_id" })
+      .select("id")
+      .single();
+
+    if (repoError || !repoRecord) {
+      console.error("Failed to upsert repo:", repoError);
+      return NextResponse.json({ error: "Failed to register repository" }, { status: 500 });
+    }
+
+    // Create scan record using internal UUID
     const { data: scan, error: scanError } = await adminClient
       .from("scans")
       .insert({
-        repo_id,
+        repo_id: repoRecord.id,
         user_id: session.user.id,
         status: "cloning",
         started_at: new Date().toISOString(),
@@ -200,11 +217,12 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (scanError || !scan) {
+      console.error("Failed to create scan:", scanError);
       return NextResponse.json({ error: "Failed to create scan" }, { status: 500 });
     }
 
     // Run scan asynchronously (respond immediately, process in background)
-    processScan(scan.id, repo_full_name, githubToken, session.user.id, deployed_url);
+    processScan(scan.id, repo_full_name, githubToken, session.user.id, repoRecord.id, deployed_url);
 
     return NextResponse.json({ scan_id: scan.id, status: "started" });
   } catch (error: any) {
@@ -218,6 +236,7 @@ async function processScan(
   repoFullName: string,
   githubToken: string,
   userId: string,
+  repoIdUuid: string,
   deployedUrl?: string
 ) {
   let repoPath: string | null = null;
@@ -296,7 +315,7 @@ async function processScan(
     await adminClient.rpc("increment_scan_count", { user_id: userId });
 
     // Update repo last scanned
-    await adminClient.from("repos").update({ last_scanned_at: new Date().toISOString() }).eq("id", scanResult);
+    await adminClient.from("repos").update({ last_scanned_at: new Date().toISOString() }).eq("id", repoIdUuid);
 
     // Send email notification to user
     try {
