@@ -50,7 +50,7 @@ export function AuthCard({ mode }: AuthCardProps) {
       provider: "github",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: "repo:status read:user user:email",
+        scopes: "repo read:user user:email",
       },
     });
     if (error) {
