@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
 
     const body = await request.json();
     const { repo_id, repo_full_name, deployed_url } = body;
