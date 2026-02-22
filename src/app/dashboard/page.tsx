@@ -149,6 +149,23 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function CleanState() {
+  return (
+    <Card className="bg-white/[0.02] border-white/5">
+      <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
+        <ShieldCheck className="w-12 h-12 text-[#10B981]" />
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-white mb-1">Latest scan clean</h3>
+          <p className="text-white/40 text-sm">Score 100 — No vulnerabilities detected</p>
+        </div>
+        <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white mt-2" asChild>
+          <Link href="/scan">Run Another Scan</Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CheckoutBanner() {
   const searchParams = useSearchParams();
   const checkoutSuccess = searchParams.get('checkout') === 'success';
@@ -377,7 +394,11 @@ export default function DashboardPage() {
               </TabsList>
               <TabsContent value="all">
                 {data.findings.length === 0 ? (
-                  <EmptyState message="Run your first scan to see security findings." />
+                  data.scan_count > 0 || data.last_scan_at ? (
+                    <CleanState />
+                  ) : (
+                    <EmptyState message="Run your first scan to see security findings." />
+                  )
                 ) : (
                   <IssuesTable findings={data.findings} />
                 )}

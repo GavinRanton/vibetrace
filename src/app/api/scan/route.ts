@@ -324,8 +324,17 @@ async function processScan(
       completed_at: new Date().toISOString(),
     }).eq("id", scanId);
 
-    // Update user scan count
-    await adminClient.rpc("increment_scan_count", { user_id: userId });
+    // Update user scan count — count completed scans for this user
+    const { count: scanCountResult } = await adminClient
+      .from("scans")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "complete");
+
+    await adminClient
+      .from("users")
+      .update({ scan_count: scanCountResult ?? 0 })
+      .eq("id", userId);
 
     // Update repo last scanned (only when a repo is involved)
     if (repoIdUuid) {

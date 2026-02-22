@@ -103,7 +103,8 @@ export default function ScanPage() {
       });
 
       if (res.ok) {
-        router.push("/dashboard");
+        const { scan_id } = await res.json();
+        router.push(`/scans?id=${scan_id}`);
         return;
       }
 
