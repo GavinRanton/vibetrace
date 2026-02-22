@@ -177,12 +177,13 @@ function CheckoutBanner() {
   );
 }
 
-function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans }: {
+function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans, plan }: {
   planLabel: string;
   scanCount: number;
   scansLimit: number;
   scanPct: number;
   lowOnScans: boolean;
+  plan: string;
 }) {
   return (
     <>
@@ -207,16 +208,14 @@ function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans }: {
             {item.label}
           </Link>
         ))}
-        {/* TODO: /repositories */}
         <Link
-          href="/dashboard"
+          href="/scans"
           className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
         >
           Repositories
         </Link>
-        {/* TODO: /reports */}
         <Link
-          href="/dashboard"
+          href="/scans"
           className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
         >
           Reports
@@ -244,9 +243,11 @@ function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans }: {
           {lowOnScans && (
             <p className="mt-1.5 text-[#F59E0B]">Running low — upgrade for unlimited scans</p>
           )}
-          <Link href="/pricing" className="mt-2 inline-block text-[#3B82F6] text-xs hover:underline">
-            Upgrade →
-          </Link>
+          {(plan === 'free' || plan === 'starter') && (
+            <Link href="/pricing" className="mt-2 inline-block text-[#3B82F6] text-xs hover:underline">
+              Upgrade →
+            </Link>
+          )}
         </div>
         <button
           onClick={handleSignOut}
@@ -312,6 +313,7 @@ export default function DashboardPage() {
     scansLimit: data.scans_limit,
     scanPct,
     lowOnScans,
+    plan: data.plan,
   };
 
   return (

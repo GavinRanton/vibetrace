@@ -131,12 +131,15 @@ export default function LandingPage() {
           <Link href="/pricing" className="hover:text-[#F8FAFC] transition-colors">Pricing</Link>
           <Link href="#faq" className="hover:text-[#F8FAFC] transition-colors">FAQ</Link>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="text-[#94A3B8] hover:text-[#F8FAFC]" asChild>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button variant="ghost" size="sm" className="text-[#94A3B8] hover:text-[#F8FAFC] hidden sm:inline-flex" asChild>
             <Link href="/login">Sign in</Link>
           </Button>
-          <Button size="sm" className="bg-[#3B82F6] hover:bg-[#2563EB] text-white" asChild>
-            <Link href="/signup">Scan your app free →</Link>
+          <Button size="sm" className="bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs sm:text-sm px-3 sm:px-4" asChild>
+            <Link href="/signup"><span className="hidden sm:inline">Scan your app free →</span><span className="sm:hidden">Scan free</span></Link>
+          </Button>
+          <Button variant="ghost" size="sm" className="text-[#94A3B8] hover:text-[#F8FAFC] sm:hidden" asChild>
+            <Link href="/login">Sign in</Link>
           </Button>
         </div>
       </nav>
