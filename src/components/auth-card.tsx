@@ -51,6 +51,7 @@ export function AuthCard({ mode }: AuthCardProps) {
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
         scopes: "repo read:user user:email",
+        queryParams: { scope: "repo read:user user:email" },
       },
     });
     if (error) {
