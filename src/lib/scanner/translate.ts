@@ -82,7 +82,7 @@ export async function translateFindings(
       const userMsg = `Translate these ${batch.length} security findings. For each fix_prompt, reference the ACTUAL vulnerable code snippet I've provided so the user's AI tool can find it — but NEVER include the file path.\n\nReturn a JSON array with objects: plain_english, business_impact, fix_prompt, verification_step.\n\n${prompt}`;
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
         {
           method: "POST",
           signal: abortCtrl.signal,
