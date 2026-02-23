@@ -11,9 +11,8 @@ const NAV_ITEMS = [
   { label: "Dashboard",    href: "/dashboard" },
   { label: "New Scan",     href: "/scan" },
   { label: "Scan History", href: "/scans" },
-  { label: "Repositories", href: "/repositories" },
   { label: "Reports",      href: "/reports" },
-  { label: "Settings",     href: "/account" },
+  { label: "Account",     href: "/account" },
 ];
 
 function handleSignOut() {
