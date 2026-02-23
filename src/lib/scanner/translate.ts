@@ -59,8 +59,11 @@ export async function translateFindings(
     }).join("\n---\n");
 
     try {
+      const abortCtrl = new AbortController();
+      const abortTimer = setTimeout(() => abortCtrl.abort(), 60000);
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
+        signal: abortCtrl.signal,
         headers: {
           "Content-Type": "application/json",
           "x-api-key": anthropicApiKey,
@@ -77,6 +80,7 @@ export async function translateFindings(
         }),
       });
 
+      clearTimeout(abortTimer);
       if (!response.ok) {
         const err = await response.text();
         console.error(`Claude API error: ${response.status} — ${err}`);
