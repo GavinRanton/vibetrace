@@ -35,11 +35,11 @@ export async function runSemgrepScan(repoPath: string): Promise<ScanResult> {
   try {
     // Use --config auto for broad community coverage (catches eval, command injection, XSS, SQL)
     // Plus our custom rules for vibe-coded app patterns (hardcoded secrets, weak crypto)
-    const cmd = `semgrep scan --config auto --config ${CUSTOM_RULES_PATH} --json --output ${outputFile} --timeout 120 ${repoPath}`;
+    const cmd = `/home/ralph/.local/bin/semgrep scan --config auto --config ${CUSTOM_RULES_PATH} --json --output ${outputFile} --timeout 120 ${repoPath}`;
     
     await execAsync(
       cmd,
-      { timeout: 180000, maxBuffer: 50 * 1024 * 1024 }
+      { timeout: 180000, maxBuffer: 50 * 1024 * 1024, env: { ...process.env, PATH: '/home/ralph/.local/bin:' + (process.env.PATH || '') } }
     );
 
     const raw = await fs.readFile(outputFile, "utf-8");
