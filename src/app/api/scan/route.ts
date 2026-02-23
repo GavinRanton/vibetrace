@@ -156,7 +156,7 @@ Respond with a JSON array only.`;
             body: JSON.stringify({
               system_instruction: { parts: [{ text: systemPrompt }] },
               contents: [{ role: "user", parts: [{ text: `Translate these ${baseFIndings.length} DAST findings into non-technical Lovable/Cursor format:\n\n${dastPrompt}` }] }],
-              generationConfig: { maxOutputTokens: 8192, temperature: 0.1 },
+              generationConfig: { maxOutputTokens: 32768, temperature: 0.1, responseMimeType: "application/json" },
             }),
           }
         );
@@ -164,10 +164,14 @@ Respond with a JSON array only.`;
         if (res.ok) {
           const data = await res.json();
           const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-          const jsonMatch = raw.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
+          try {
+            // responseMimeType:application/json returns clean JSON directly
+            const jsonStart = raw.indexOf("[");
+            const jsonEnd = raw.lastIndexOf("]") + 1;
+            const parsed = JSON.parse(jsonStart >= 0 ? raw.slice(jsonStart, jsonEnd) : raw);
             parsed.forEach((t: any, i: number) => translations.set(String(i), t));
+          } catch (parseErr: any) {
+            console.error("[ZAP] JSON parse error:", parseErr.message, "raw length:", raw.length);
           }
         }
       }
