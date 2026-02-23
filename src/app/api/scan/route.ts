@@ -110,21 +110,89 @@ async function runZapScan(url: string, scanId: string): Promise<number> {
       "0": "low",
     };
 
-    const findings = alerts.map((alert: any) => ({
-      scan_id: scanId,
+    // Strip HTML tags from ZAP text fields
+    function stripHtml(html: string): string {
+      return (html || "").replace(/<[^>]+>/g, "").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&").replace(/&#39;/g,"'").replace(/&quot;/g,'"').trim();
+    }
+
+    // Build base findings
+    const baseFIndings = alerts.map((alert: any) => ({
       severity: riskMap[String(alert.riskcode)] ?? "low",
-      category: "dast",
-      rule_id: alert.pluginid ? `zap-${alert.pluginid}` : "zap-unknown",
-      file_path: url,
-      line_number: null,
-      code_snippet: alert.evidence || null,
-      raw_output: alert,
-      plain_english: alert.desc || alert.name || "Security issue detected by DAST scan",
-      business_impact: `${riskMap[String(alert.riskcode)] ?? "low"} severity DAST finding: ${alert.name ?? "Unknown"}`,
-      fix_prompt: alert.solution || `Remediate the ${alert.name ?? "security"} issue found at ${url}`,
-      verification_step: "Re-run the DAST scan against the deployed URL to verify the fix",
-      status: "open",
+      name: alert.name ?? "Unknown",
+      desc: stripHtml(alert.desc || alert.name || ""),
+      solution: stripHtml(alert.solution || ""),
+      evidence: alert.evidence || null,
+      pluginid: alert.pluginid,
     }));
+
+    // Translate via Gemini for Lovable/Cursor format prompts
+    let translations: Map<string, any> = new Map();
+    try {
+      const vaultRes = await fetch("http://127.0.0.1:8443/secrets/vibetrace/GEMINI_API_KEY", {
+        headers: { Authorization: "Bearer f4e28f48a1944aec09e7141ecb980ff518d06b53f2ed9897981ee9a5776ade40" },
+      }).catch(() => null);
+      const vaultData = vaultRes?.ok ? await vaultRes.json() : null;
+      const geminiKey = vaultData?.value ?? process.env.GEMINI_API_KEY;
+
+      if (geminiKey) {
+        const dastPrompt = baseFIndings.map((f, i) => `Finding ${i+1}: ${f.name}\nSeverity: ${f.severity}\nWhat ZAP found: ${f.desc}\nZAP fix: ${f.solution}`).join("\n---\n");
+        const systemPrompt = `You are a security expert translating DAST (live site) security findings for non-technical founders using Lovable, Bolt.new, or Cursor to build their apps.
+
+For each finding, write:
+1. plain_english: 1-2 sentence plain explanation using an analogy. No jargon.
+2. business_impact: What could actually go wrong. Be specific to the risk level.
+3. fix_prompt: A complete prompt to paste into Lovable/Cursor. Must start with "In Lovable (or Cursor), paste this exactly:\n\"". Reference the specific header or setting to add. For web frameworks (Next.js, Express, etc), give the specific middleware/config code pattern to add. Never mention server config files.
+4. verification_step: Simple check — usually "Visit your site in a browser and check the Network tab headers" or similar.
+
+Respond with a JSON array only.`;
+
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 90000);
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
+          {
+            method: "POST", signal: ctrl.signal,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              system_instruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ role: "user", parts: [{ text: `Translate these ${baseFIndings.length} DAST findings into non-technical Lovable/Cursor format:\n\n${dastPrompt}` }] }],
+              generationConfig: { maxOutputTokens: 8192, temperature: 0.1 },
+            }),
+          }
+        );
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json();
+          const raw = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
+          const jsonMatch = raw.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            parsed.forEach((t: any, i: number) => translations.set(String(i), t));
+          }
+        }
+      }
+    } catch (e: any) {
+      console.error("[ZAP] Gemini translation error:", e.message);
+    }
+
+    const findings = baseFIndings.map((f, i) => {
+      const t = translations.get(String(i));
+      return {
+        scan_id: scanId,
+        severity: f.severity,
+        category: "dast",
+        rule_id: f.pluginid ? `zap-${f.pluginid}` : "zap-unknown",
+        file_path: url,
+        line_number: null,
+        code_snippet: f.evidence,
+        raw_output: alerts[i],
+        plain_english: t?.plain_english || f.desc,
+        business_impact: t?.business_impact || `${f.severity} severity DAST finding: ${f.name}`,
+        fix_prompt: t?.fix_prompt || f.solution || `Fix the ${f.name} issue on your live site`,
+        verification_step: t?.verification_step || "Re-run the DAST scan to verify the fix",
+        status: "open",
+      };
+    });
 
     if (findings.length > 0) {
       const { error } = await adminClient.from("findings").insert(findings);
@@ -333,19 +401,26 @@ async function processScan(
       await runZapScan(deployedUrl, scanId);
     }
 
+    // Fetch ALL findings for this scan (SAST + DAST) for accurate score
+    const { data: allFindings } = await adminClient
+      .from("findings")
+      .select("severity")
+      .eq("scan_id", scanId);
+    const allF = allFindings ?? mappedFindings;
+
     // Calculate score and update scan
-    const score = calculateScore(mappedFindings);
+    const score = calculateScore(allF);
     const counts = {
-      critical: mappedFindings.filter(f => f.severity === "critical").length,
-      high: mappedFindings.filter(f => f.severity === "high").length,
-      medium: mappedFindings.filter(f => f.severity === "medium").length,
-      low: mappedFindings.filter(f => f.severity === "low").length,
+      critical: allF.filter((f: any) => f.severity === "critical").length,
+      high: allF.filter((f: any) => f.severity === "high").length,
+      medium: allF.filter((f: any) => f.severity === "medium").length,
+      low: allF.filter((f: any) => f.severity === "low").length,
     };
 
     await adminClient.from("scans").update({
       status: "complete",
       score,
-      total_findings: mappedFindings.length,
+      total_findings: allF.length,
       critical_count: counts.critical,
       high_count: counts.high,
       medium_count: counts.medium,
@@ -382,7 +457,7 @@ async function processScan(
           scan_id: scanId,
           repo_name: repoFullName ?? deployedUrl ?? "URL scan",
           score,
-          total_findings: mappedFindings.length,
+          total_findings: allF.length,
           critical_count: counts.critical,
           high_count: counts.high,
           medium_count: counts.medium,
