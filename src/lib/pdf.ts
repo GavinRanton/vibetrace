@@ -1,5 +1,8 @@
 import puppeteer from 'puppeteer';
 import { createClient } from '@supabase/supabase-js';
+import * as fs from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vibetrace.app';
 
@@ -448,10 +451,16 @@ export async function generateScanReport(scanId: string): Promise<Buffer> {
 
   const html = buildReportHtml(scan, findings || []);
 
+  // Write HTML to a temp file — avoids protocol timeout on large documents
+  const tmpDir = os.tmpdir();
+  const tmpFile = path.join(tmpDir, `vibetrace-report-${scanId}-${Date.now()}.html`);
+  await fs.writeFile(tmpFile, html, 'utf-8');
+
   // Launch Puppeteer and generate PDF
   const browser = await puppeteer.launch({
     headless: true,
     executablePath: '/usr/bin/chromium-browser',
+    protocolTimeout: 120000,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -463,17 +472,20 @@ export async function generateScanReport(scanId: string): Promise<Buffer> {
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    // Navigate to local file — much faster and more reliable than setContent for large HTML
+    await page.goto(`file://${tmpFile}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
     
     const pdf = await page.pdf({
       format: 'A4',
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
       printBackground: true,
       displayHeaderFooter: false,
+      timeout: 60000,
     });
 
     return Buffer.from(pdf);
   } finally {
     await browser.close();
+    await fs.unlink(tmpFile).catch(() => {});
   }
 }

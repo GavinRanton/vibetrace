@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Menu, GitBranch, ScanLine, Lock, RefreshCw } from "lucide-react";
+import { Menu, GitBranch, ScanLine, Lock, RefreshCw, KeyRound } from "lucide-react";
 
 type DbRepo = {
   id: string;
@@ -143,6 +143,19 @@ export default function RepositoriesPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  const hasPrivateRepos = repos.some((r) => r.is_private);
+
+  async function reconnectGitHub() {
+    await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        scopes: "repo read:user user:email",
+        redirectTo: `${window.location.origin}/repositories`,
+        queryParams: { prompt: "consent" },
+      },
+    });
+  }
+
   async function handleScan(repo: MergedRepo) {
     setScanningRepo(repo.full_name);
     try {
@@ -227,6 +240,17 @@ export default function RepositoriesPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                {!hasPrivateRepos && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={reconnectGitHub}
+                    className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 gap-1.5 text-xs"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    Connect Private Repos
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
