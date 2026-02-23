@@ -58,7 +58,7 @@ async function runZapScan(url: string, scanId: string): Promise<number> {
       await fs.unlink(resultsPath);
     } catch {}
 
-    const dockerCmd = `docker run --rm -v /tmp/zap:/zap/wrk:rw ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t ${url} -J /zap/wrk/results.json -I`;
+    const dockerCmd = `docker run --rm -v /tmp/zap:/zap/wrk:rw ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t ${url} -J results.json -I`;
 
     console.log(`[ZAP] Starting baseline scan for: ${url}`);
 
