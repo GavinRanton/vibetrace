@@ -35,6 +35,7 @@ type Scan = {
   created_at: string;
   repo_id: string | null;
   repo_full_name: string | null;
+  zap_included: boolean | null;
 };
 
 type Finding = {
@@ -363,7 +364,11 @@ function FindingsPanel({
           <ShieldCheck className="w-8 h-8 text-green-400" />
           <div>
             <p className="text-white font-medium">No issues found</p>
-            <p className="text-white/40 text-sm">Your code is clean!</p>
+            {scan.zap_included ? (
+              <p className="text-white/40 text-sm">Live site scan complete — no vulnerabilities detected. ZAP checked for XSS, SQL injection, missing security headers, CSRF, and more.</p>
+            ) : (
+              <p className="text-white/40 text-sm">Your code is clean!</p>
+            )}
           </div>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} className="text-white/40">

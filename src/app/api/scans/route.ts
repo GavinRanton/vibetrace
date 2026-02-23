@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
         completed_at,
         created_at,
         repo_id,
+        zap_included,
         repos ( full_name )
       `)
       .eq("user_id", userId)

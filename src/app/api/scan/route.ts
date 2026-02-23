@@ -66,7 +66,7 @@ async function runZapScan(url: string, scanId: string): Promise<number> {
       await Promise.race([
         execAsync(dockerCmd),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("ZAP scan timed out after 120s")), 120_000)
+          setTimeout(() => reject(new Error("ZAP scan timed out after 300s")), 300_000)
         ),
       ]);
     } catch (err: any) {
