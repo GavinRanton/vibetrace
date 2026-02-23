@@ -12,124 +12,86 @@ export async function GET() {
   try {
     const cookieStore = await cookies();
 
-    // Auth client (anon key) — used only to get the session
     const authClient = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
+          getAll() { return cookieStore.getAll(); },
           setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {}
+            try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {}
           },
         },
       }
     );
 
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser();
-
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userId = user.id;
 
-    // Service-role client — used for all DB queries
     const db = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
+          getAll() { return cookieStore.getAll(); },
           setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch {}
+            try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)); } catch {}
           },
         },
       }
     );
 
     // Fetch user record
-    const { data: userData, error: userError } = await db
+    const { data: userData } = await db
       .from("users")
       .select("plan, scan_count")
       .eq("id", userId)
       .single();
 
-    if (userError) {
-      console.error("Dashboard: failed to fetch user:", userError);
-      return NextResponse.json(
-        { error: "Failed to load dashboard" },
-        { status: 500 }
-      );
-    }
-
     const plan: string = userData?.plan ?? "free";
     const scanCount: number = userData?.scan_count ?? 0;
     const scansLimit: number = SCANS_LIMIT[plan] ?? 5;
 
-    // Fetch latest 20 findings via scans join
-    const { data: findingsData, error: findingsError } = await db
-      .from("findings")
-      .select(
-        `id, severity, category, file_path, plain_english, fix_prompt, status, created_at,
-         scans!inner ( user_id )`
-      )
-      .eq("scans.user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    if (findingsError) {
-      console.error("Dashboard: failed to fetch findings:", findingsError);
-      return NextResponse.json(
-        { error: "Failed to load dashboard" },
-        { status: 500 }
-      );
-    }
-
-    // Fetch last scan date
-    const { data: lastScanData, error: lastScanError } = await db
+    // Find the LATEST completed scan — dashboard always reflects the most recent result
+    const { data: latestScan } = await db
       .from("scans")
-      .select("completed_at")
+      .select("id, completed_at, score, total_findings, critical_count, high_count, medium_count, low_count, repo_full_name")
       .eq("user_id", userId)
+      .eq("status", "complete")
       .order("completed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (lastScanError) {
-      console.error("Dashboard: failed to fetch last scan:", lastScanError);
-      return NextResponse.json(
-        { error: "Failed to load dashboard" },
-        { status: 500 }
-      );
-    }
+    // Fetch findings for that scan only
+    let findings: Record<string, unknown>[] = [];
+    let severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
 
-    // Strip the nested scans join field before returning
-    const findings = (findingsData ?? []).map((f) => {
-      const { scans: _scans, ...rest } = f as typeof f & { scans: unknown };
-      return rest;
-    });
+    if (latestScan) {
+      const { data: findingsData } = await db
+        .from("findings")
+        .select("id, severity, category, file_path, line_number, plain_english, fix_prompt, verification_step, status, created_at")
+        .eq("scan_id", latestScan.id)
+        .order("severity", { ascending: true });
 
-    // Severity counts
-    const severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
-    for (const f of findings) {
-      const sev = (f.severity as string)?.toLowerCase();
-      if (sev in severityCounts) {
-        severityCounts[sev as keyof typeof severityCounts]++;
+      findings = findingsData ?? [];
+
+      // Use scan-level counts if available, otherwise compute from findings
+      if (latestScan.critical_count !== null) {
+        severityCounts = {
+          critical: latestScan.critical_count ?? 0,
+          high:     latestScan.high_count     ?? 0,
+          medium:   latestScan.medium_count   ?? 0,
+          low:      latestScan.low_count      ?? 0,
+        };
+      } else {
+        for (const f of findings) {
+          const sev = (f.severity as string)?.toLowerCase();
+          if (sev in severityCounts) severityCounts[sev as keyof typeof severityCounts]++;
+        }
       }
     }
 
@@ -139,13 +101,12 @@ export async function GET() {
       scans_limit: scansLimit,
       findings,
       severity_counts: severityCounts,
-      last_scan_at: lastScanData?.completed_at ?? null,
+      last_scan_at: latestScan?.completed_at ?? null,
+      latest_scan_repo: latestScan?.repo_full_name ?? null,
+      user_email: user.email ?? null,
     });
   } catch (err) {
     console.error("Dashboard: unexpected error:", err);
-    return NextResponse.json(
-      { error: "Failed to load dashboard" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to load dashboard" }, { status: 500 });
   }
 }
