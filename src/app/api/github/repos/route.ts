@@ -41,7 +41,7 @@ export async function GET() {
   const githubToken = userData?.github_access_token || session?.provider_token;
 
   if (!githubToken) {
-    return NextResponse.json({ error: "No GitHub token — please sign out and sign in again" }, { status: 401 });
+    return NextResponse.json({ repos: [], has_token: false });
   }
 
   // Save to DB if we only had it from session (so it persists)
@@ -71,6 +71,7 @@ export async function GET() {
   const repos = await response.json();
   
   return NextResponse.json({
+    has_token: true,
     repos: repos.map((repo: any) => ({
       id: repo.id,
       name: repo.name,

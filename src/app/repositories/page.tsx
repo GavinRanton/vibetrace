@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Menu, GitBranch, ScanLine, Lock, RefreshCw, KeyRound } from "lucide-react";
+import { Menu, GitBranch, ScanLine, Lock, RefreshCw, Github } from "lucide-react";
 
 type DbRepo = {
   id: string;
@@ -54,7 +54,8 @@ export default function RepositoriesPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [scanningRepo, setScanningRepo] = useState<string | null>(null);
-  const [githubToken, setGithubToken] = useState<string | null>(null);
+  const [hasDbToken, setHasDbToken] = useState(false);
+  const [connected, setConnected] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,26 +66,23 @@ export default function RepositoriesPage() {
     if (showSyncing) setSyncing(true);
     else setLoading(true);
     try {
-      // Get GitHub token from session
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.provider_token ?? null;
-      setGithubToken(token);
-
-      // Load DB repos and dashboard data in parallel
-      const [repoRes, dashRes] = await Promise.all([
+      // Load DB repos, dashboard data, and GitHub repos in parallel
+      const [repoRes, dashRes, ghRes] = await Promise.all([
         fetch("/api/repositories"),
         fetch("/api/dashboard"),
+        fetch("/api/github/repos", { cache: "no-store" }),
       ]);
-      const [repoData, dash] = await Promise.all([
+      const [repoData, dash, ghData] = await Promise.all([
         repoRes.json(),
         dashRes.json(),
+        ghRes.ok ? ghRes.json() : Promise.resolve({ repos: [], has_token: false }),
       ]);
       setDashData(dash);
+      setHasDbToken(!!ghData.has_token);
 
       const dbRepos: DbRepo[] = repoData.repos ?? [];
       const dbMap = new Map(dbRepos.map((r) => [r.full_name, r]));
 
-      // If we have a GitHub token, also fetch all GitHub repos (including private)
       let merged: MergedRepo[] = dbRepos.map((r) => ({
         db_id: r.id,
         full_name: r.full_name,
@@ -95,30 +93,21 @@ export default function RepositoriesPage() {
         default_branch: "main",
       }));
 
-      if (token) {
-        const ghRes = await fetch("/api/github/repos", { cache: "no-store" });
-        if (ghRes.ok) {
-          const ghData = await ghRes.json();
-          const ghRepos: GhRepo[] = ghData.repos ?? [];
-
-          // Add any GitHub repos not yet in DB
-          for (const ghRepo of ghRepos) {
-            if (!dbMap.has(ghRepo.full_name)) {
-              merged.push({
-                db_id: null,
-                full_name: ghRepo.full_name,
-                name: ghRepo.name,
-                is_private: ghRepo.private,
-                last_scanned_at: null,
-                scan_count: 0,
-                default_branch: ghRepo.default_branch,
-              });
-            } else {
-              // Update is_private from GitHub (DB might be stale)
-              const existing = merged.find((m) => m.full_name === ghRepo.full_name);
-              if (existing) existing.is_private = ghRepo.private;
-            }
-          }
+      const ghRepos: GhRepo[] = ghData.repos ?? [];
+      for (const ghRepo of ghRepos) {
+        if (!dbMap.has(ghRepo.full_name)) {
+          merged.push({
+            db_id: null,
+            full_name: ghRepo.full_name,
+            name: ghRepo.name,
+            is_private: ghRepo.private,
+            last_scanned_at: null,
+            scan_count: 0,
+            default_branch: ghRepo.default_branch,
+          });
+        } else {
+          const existing = merged.find((m) => m.full_name === ghRepo.full_name);
+          if (existing) existing.is_private = ghRepo.private;
         }
       }
 
@@ -145,17 +134,6 @@ export default function RepositoriesPage() {
 
   const hasPrivateRepos = repos.some((r) => r.is_private);
 
-  async function reconnectGitHub() {
-    await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        scopes: "repo read:user user:email",
-        redirectTo: `${window.location.origin}/repositories`,
-        queryParams: { prompt: "consent" },
-      },
-    });
-  }
-
   async function handleScan(repo: MergedRepo) {
     setScanningRepo(repo.full_name);
     try {
@@ -163,9 +141,6 @@ export default function RepositoriesPage() {
         repo_full_name: repo.full_name,
         repo_id: repo.db_id ?? undefined,
       };
-      // Always send github_token so private repos work
-      if (githubToken) body.github_token = githubToken;
-
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -234,21 +209,21 @@ export default function RepositoriesPage() {
                 <h1 className="text-2xl font-bold">Repositories</h1>
                 <p className="text-white/40 text-sm mt-1">
                   {repos.length} repositor{repos.length !== 1 ? "ies" : "y"} connected
-                  {!githubToken && (
-                    <span className="ml-2 text-amber-400/70">· Sign in again to see private repos</span>
+                  {!hasDbToken && (
+                    <span className="ml-2 text-white/40">· Connect GitHub to see private repos</span>
                   )}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {!githubToken && (
+                {!hasDbToken && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={reconnectGitHub}
-                    className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 gap-1.5 text-xs"
+                    onClick={() => { window.location.href = "/api/github/connect"; }}
+                    className="border-blue-500/40 text-blue-400 hover:bg-blue-500/10 gap-1.5 text-xs"
                   >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    Reconnect GitHub
+                    <Github className="w-3.5 h-3.5" />
+                    Connect GitHub
                   </Button>
                 )}
                 <Button
