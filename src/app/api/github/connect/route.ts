@@ -9,7 +9,7 @@ export async function GET() {
   const state = Buffer.from(JSON.stringify({ userId: user.id, ts: Date.now() })).toString('base64url')
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_OAUTH_CLIENT_ID!,
-    redirect_uri: `${process.env.NEXT_PUBLIC_SITE_URL}/api/github/callback`,
+    redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/github/callback`,
     scope: 'repo read:user user:email',
     state,
   })
