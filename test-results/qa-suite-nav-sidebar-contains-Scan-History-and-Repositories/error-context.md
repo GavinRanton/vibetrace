@@ -1,0 +1,67 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - img "VibeTrace" [ref=e6]
+        - link "VibeTrace" [ref=e7] [cursor=pointer]:
+          - /url: /
+      - navigation [ref=e8]:
+        - link "Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: /dashboard
+        - link "New Scan" [ref=e10] [cursor=pointer]:
+          - /url: /scan
+        - link "Scan History" [ref=e11] [cursor=pointer]:
+          - /url: /scans
+        - link "Reports" [ref=e12] [cursor=pointer]:
+          - /url: /reports
+        - link "Account" [ref=e13] [cursor=pointer]:
+          - /url: /account
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]: Free plan
+          - generic [ref=e17]: 0 / 5 scans used
+          - progressbar [ref=e18]
+          - link "Upgrade →" [ref=e20] [cursor=pointer]:
+            - /url: /pricing
+        - button "Sign out" [ref=e21]:
+          - img [ref=e22]
+          - text: Sign out
+    - main [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - heading "Security Overview" [level=1] [ref=e29]
+          - paragraph [ref=e30]: No scans yet
+        - link "+ New Scan" [ref=e31] [cursor=pointer]:
+          - /url: /scan
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e35]: Critical
+          - generic [ref=e37]: "0"
+        - generic [ref=e38]:
+          - generic [ref=e40]: High
+          - generic [ref=e42]: "0"
+        - generic [ref=e43]:
+          - generic [ref=e45]: Medium
+          - generic [ref=e47]: "0"
+        - generic [ref=e48]:
+          - generic [ref=e50]: Low
+          - generic [ref=e52]: "0"
+      - generic [ref=e53]:
+        - tablist [ref=e54]:
+          - tab "All Issues" [selected] [ref=e55]
+          - tab "Critical" [ref=e56]
+          - tab "Dependencies" [ref=e57]
+        - tabpanel "All Issues" [ref=e58]:
+          - generic [ref=e60]:
+            - img [ref=e61]
+            - generic [ref=e64]:
+              - heading "No scans yet" [level=3] [ref=e65]
+              - paragraph [ref=e66]: Run your first scan to see security findings.
+            - link "New Scan" [ref=e67] [cursor=pointer]:
+              - /url: /scan
+  - region "Notifications alt+T"
+  - alert [ref=e68]: VibeTrace — Security Scanning for Modern Apps
+```
