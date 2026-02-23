@@ -174,7 +174,15 @@ export async function POST(request: NextRequest) {
 
     // Prefer token sent explicitly from client (provider_token is not reliably
     // available via server-side getSession() behind Cloudflare/SSR proxy).
-    const githubToken = bodyToken ?? session?.provider_token ?? null;
+    let githubToken = bodyToken ?? session?.provider_token ?? null;
+    if (!githubToken) {
+      const { data: userData } = await adminClient
+        .from("users")
+        .select("github_access_token")
+        .eq("id", user.id)
+        .single();
+      githubToken = userData?.github_access_token ?? null;
+    }
     if (!githubToken && repo_id) {
       return NextResponse.json({ error: "No GitHub token — please re-authenticate" }, { status: 401 });
     }

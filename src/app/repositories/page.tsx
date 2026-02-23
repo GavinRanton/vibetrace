@@ -240,7 +240,7 @@ export default function RepositoriesPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {!hasPrivateRepos && (
+                {!githubToken && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -248,7 +248,7 @@ export default function RepositoriesPage() {
                     className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 gap-1.5 text-xs"
                   >
                     <KeyRound className="w-3.5 h-3.5" />
-                    Connect Private Repos
+                    Reconnect GitHub
                   </Button>
                 )}
                 <Button

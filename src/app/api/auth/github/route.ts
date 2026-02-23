@@ -27,7 +27,7 @@ export async function GET() {
     provider: "github",
     options: {
       redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-      scopes: "repo:status read:user user:email",
+      scopes: "repo read:user user:email",
     },
   });
 
