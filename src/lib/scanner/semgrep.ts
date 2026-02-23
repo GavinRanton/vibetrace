@@ -25,27 +25,20 @@ export interface ScanResult {
   duration: number;
 }
 
-// Curated rules for vibe-coded app patterns
-const SEMGREP_RULES = [
-  "p/javascript",
-  "p/typescript",
-  "p/react",
-  "p/nextjs",
-  "p/secrets",
-  "p/owasp-top-ten",
-  "p/sql-injection",
-  "p/xss",
-];
+// Path to custom VibeTrace rules (hardcoded secrets, weak crypto, etc.)
+const CUSTOM_RULES_PATH = path.join(process.cwd(), "semgrep-rules");
 
 export async function runSemgrepScan(repoPath: string): Promise<ScanResult> {
   const startTime = Date.now();
   const outputFile = path.join(os.tmpdir(), `semgrep-${Date.now()}.json`);
 
   try {
-    const rulesArg = SEMGREP_RULES.map(r => `--config ${r}`).join(" ");
+    // Use --config auto for broad community coverage (catches eval, command injection, XSS, SQL)
+    // Plus our custom rules for vibe-coded app patterns (hardcoded secrets, weak crypto)
+    const cmd = `semgrep scan --config auto --config ${CUSTOM_RULES_PATH} --json --output ${outputFile} --timeout 120 ${repoPath}`;
     
     await execAsync(
-      `semgrep scan ${rulesArg} --json --output ${outputFile} --timeout 120 ${repoPath}`,
+      cmd,
       { timeout: 180000, maxBuffer: 50 * 1024 * 1024 }
     );
 
