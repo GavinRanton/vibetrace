@@ -290,12 +290,9 @@ async function processScan(
       console.log('[SEMGREP] starting scan on', repoPath);
       const scanResult = await runSemgrepScan(repoPath);
 
-      // Translate findings with Claude
+      // Translate findings with Gemini
       await adminClient.from("scans").update({ status: "translating" }).eq("id", scanId);
-      const translations = await translateFindings(
-        scanResult.findings,
-        process.env.ANTHROPIC_API_KEY || ""
-      );
+      const translations = await translateFindings(scanResult.findings);
 
       // Map and insert findings
       const semgrepFindings = scanResult.findings.map((f) => {
