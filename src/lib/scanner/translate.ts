@@ -12,8 +12,26 @@ const SYSTEM_PROMPT = `You are a security expert helping non-technical founders 
 For each vulnerability, provide:
 1. **plain_english**: A clear, non-technical explanation of what the vulnerability means. Use analogies. Example: "This is like leaving your house keys under the doormat — anyone who knows where to look can get in."
 2. **business_impact**: What could happen to their users/business. Be specific but not fear-mongering. Use severity levels: Critical = "someone can access all your users data right now", High = "an attacker could exploit this with some effort", Medium = "this weakens your security posture", Low = "best practice improvement".
-3. **fix_prompt**: A copy-paste prompt they can give to Lovable or Cursor to fix the issue. Be specific about the file and what needs to change. Start with "Fix the security vulnerability in..."
+3. **fix_prompt**: A complete message the user can copy and paste directly into Lovable, Cursor, or ChatGPT to fix their code. CRITICAL RULES:
+   - Do NOT mention file paths, line numbers, or server directories
+   - Do NOT use technical jargon the user would not understand
+   - Write it in first person as if the user is speaking to their AI tool
+   - Start with: "In Lovable (or Cursor), paste this exactly:\n\""
+   - End with closing quote and period
+   - Be specific about WHAT the vulnerability is and HOW to fix it in plain language
+   - The prompt should work even if the user does not know which file has the issue
 4. **verification_step**: After applying the fix, what should they check to confirm it worked.
+
+Examples of good fix_prompt output:
+
+Example 1 (Hardcoded Secret):
+"In Lovable (or Cursor), paste this exactly:\n\"I have a critical security issue in my app. I have hardcoded an API key directly in my code as a variable called API_KEY. This is dangerous because anyone who sees my code can steal my API key. Please find all hardcoded secrets, API keys, passwords, and tokens in my server code and move them to environment variables using process.env.VARIABLE_NAME. Also make sure .env is listed in my .gitignore file so it never gets uploaded to GitHub.\""
+
+Example 2 (SQL Injection):
+"In Lovable (or Cursor), paste this exactly:\n\"I have a SQL injection vulnerability in my app. My code is building database queries by joining strings together with user input, which lets attackers access or delete my entire database. Please find all places in my code where database queries are built using string concatenation or template literals with user input, and replace them with parameterised queries or a query builder that handles this safely.\""
+
+Example 3 (eval with user input):
+"In Lovable (or Cursor), paste this exactly:\n\"I have a critical security vulnerability where my code uses eval() to run code from user input. This lets attackers execute any code they want on my server. Please find and remove all uses of eval() in my code and replace them with safe alternatives — JSON.parse() for JSON data, or ask me what the eval() is trying to do so we can find a safer way.\""
 
 Respond in JSON format only. No markdown, no explanation outside the JSON.`;
 
@@ -31,7 +49,7 @@ export async function translateFindings(
     const prompt = batch.map((f, idx) => `
 Finding ${idx + 1}:
 - Rule: ${f.check_id}
-- File: ${f.path}:${f.start.line}
+- File: ${f.path.replace(/^.*vibetrace-scan-[^\/]+\//, '')}:${f.start.line}
 - Severity: ${f.extra.severity}
 - Message: ${f.extra.message}
 - Code: ${f.extra.lines}
