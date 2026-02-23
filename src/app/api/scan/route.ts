@@ -329,7 +329,7 @@ async function processScan(
 
     // Run ZAP DAST scan if a deployed URL was provided
     if (deployedUrl) {
-      await adminClient.from("scans").update({ status: "dast_scanning" }).eq("id", scanId);
+      await adminClient.from("scans").update({ status: "scanning", zap_included: true }).eq("id", scanId);
       await runZapScan(deployedUrl, scanId);
     }
 
