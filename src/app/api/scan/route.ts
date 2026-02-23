@@ -41,8 +41,8 @@ function isPrivateUrl(url: string): boolean {
 async function runZapScan(url: string, scanId: string): Promise<number> {
   try {
     if (isPrivateUrl(url)) {
-      console.warn(`[ZAP] Skipping scan — private/internal URL rejected: ${url}`);
-      return 0;
+      // Treat as a hard failure so we don't show a misleading 100/100 for a scan we refused to run.
+      throw new Error(`ZAP refused to scan private/internal URL: ${url}`);
     }
 
     const zapWorkDir = "/tmp/zap";
@@ -83,19 +83,21 @@ async function runZapScan(url: string, scanId: string): Promise<number> {
     try {
       raw = await fs.readFile(resultsPath, "utf-8");
     } catch {
-      console.warn("[ZAP] No results file found — scan may have failed entirely");
-      return 0;
+      // Hard fail: otherwise we mark the scan complete with 0 findings + score 100, which is misleading.
+      throw new Error("ZAP did not produce results.json (scan failed, timed out, or was blocked)");
     }
 
     let parsed: any;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      console.warn("[ZAP] Could not parse results.json");
-      return 0;
+      throw new Error("ZAP produced an unreadable results.json (JSON parse failed)");
     }
 
     const sites: any[] = parsed?.site ?? [];
+    if (sites.length === 0) {
+      throw new Error("ZAP results.json contained no site data (scan likely failed)");
+    }
     const alerts: any[] = sites[0]?.alerts ?? [];
 
     if (alerts.length === 0) {

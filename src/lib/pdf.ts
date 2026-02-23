@@ -107,20 +107,20 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
             ${f.code_snippet ? `<pre class="code-snippet">${escapeHtml(f.code_snippet)}</pre>` : ''}
             <div class="finding-section">
               <h4>What this means</h4>
-              <p>${f.plain_english}</p>
+              <p>${escapeHtml(f.plain_english || '')}</p>
             </div>
             <div class="finding-section">
               <h4>Business impact</h4>
-              <p>${f.business_impact}</p>
+              <p>${escapeHtml(f.business_impact || '')}</p>
             </div>
             <div class="finding-section fix-section">
               <h4>🔧 How to fix</h4>
-              <p>${f.fix_prompt}</p>
+              <pre class="fix-prompt">${escapeHtml(f.fix_prompt || '')}</pre>
             </div>
             ${f.verification_step ? `
             <div class="finding-section">
               <h4>✅ Verification</h4>
-              <p>${f.verification_step}</p>
+              <p>${escapeHtml(f.verification_step || '')}</p>
             </div>` : ''}
           </div>
         `).join('')}
@@ -261,6 +261,15 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
   .fix-section h4 { color: #3B82F6; }
   .fix-section p { color: #93C5FD; }
 
+  .fix-prompt {
+    color: #93C5FD;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  }
+
   /* Summary table */
   .summary-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
   .summary-table th { background: #1E293B; color: #94A3B8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 14px; text-align: left; border-bottom: 1px solid #334155; }
@@ -269,8 +278,11 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
 
   /* Page breaks */
   @media print {
-    .finding-card { page-break-inside: avoid; }
-    .severity-group { page-break-inside: avoid; }
+    /* Allow long findings (especially fix prompts) to flow across pages.
+       page-break-inside: avoid can cause Puppeteer to clip content at the page boundary. */
+    .finding-card { page-break-inside: auto; break-inside: auto; }
+    .severity-group { page-break-inside: auto; break-inside: auto; }
+    .finding-section, .code-snippet { break-inside: auto; }
   }
   
   /* Confidential banner */
