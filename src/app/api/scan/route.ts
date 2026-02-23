@@ -166,13 +166,15 @@ export async function POST(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
 
     const body = await request.json();
-    const { repo_id, repo_full_name, deployed_url } = body;
+    const { repo_id, repo_full_name, deployed_url, github_token: bodyToken } = body;
 
     if (!repo_id && !deployed_url) {
       return NextResponse.json({ error: "Provide a repository or deployed URL" }, { status: 400 });
     }
 
-    const githubToken = session?.provider_token ?? null;
+    // Prefer token sent explicitly from client (provider_token is not reliably
+    // available via server-side getSession() behind Cloudflare/SSR proxy).
+    const githubToken = bodyToken ?? session?.provider_token ?? null;
     if (!githubToken && repo_id) {
       return NextResponse.json({ error: "No GitHub token — please re-authenticate" }, { status: 401 });
     }

@@ -92,6 +92,11 @@ export default function ScanPage() {
     setErrorMessage("");
 
     try {
+      // Get provider_token from client-side session — server-side getSession()
+      // cannot access it from cookies in the Supabase SSR context.
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const providerToken = currentSession?.provider_token ?? null;
+
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,6 +104,7 @@ export default function ScanPage() {
           repo_id: selectedRepo?.id ?? null,
           repo_full_name: selectedRepo?.full_name ?? null,
           deployed_url: deployedUrl || undefined,
+          github_token: providerToken,
         }),
       });
 
