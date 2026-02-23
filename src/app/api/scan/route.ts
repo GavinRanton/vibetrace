@@ -220,13 +220,30 @@ export async function POST(request: NextRequest) {
       repoUuid = repoRecord.id;
     }
 
-    // Create scan record using internal UUID (null for URL-only scans)
+    // For URL-only scans, create a placeholder repo so repo_id is never null
+    if (!repoUuid && deployed_url) {
+      const urlLabel = new URL(deployed_url).hostname.replace(/[^a-z0-9-]/g, '-');
+      const { data: urlRepo } = await adminClient
+        .from("repos")
+        .upsert({
+          user_id: user.id,
+          github_repo_id: "url-" + Buffer.from(deployed_url).toString("hex").substring(0, 16),
+          name: urlLabel,
+          full_name: "url-scan/" + urlLabel,
+          is_private: false,
+        }, { onConflict: "user_id,github_repo_id" })
+        .select("id")
+        .single();
+      if (urlRepo) repoUuid = urlRepo.id;
+    }
+
+    // Create scan record
     const { data: scan, error: scanError } = await adminClient
       .from("scans")
       .insert({
         repo_id: repoUuid,
         user_id: user.id,
-        status: "cloning",
+        status: deployed_url && !repo_full_name ? "dast_scanning" : "cloning",
         started_at: new Date().toISOString(),
       })
       .select()

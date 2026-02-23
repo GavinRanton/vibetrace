@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useState, useEffect } from 'react';
+import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -225,6 +226,25 @@ export default function DashboardPage() {
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((d) => { setData(d); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
+  }, []);
+
+  // Capture GitHub provider_token immediately after login and persist it to DB
+  // (provider_token is only available client-side and disappears after session refresh)
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const token = session?.provider_token;
+      if (token) {
+        fetch('/api/auth/save-github-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ github_token: token }),
+        }).catch(() => {});
+      }
+    });
   }, []);
 
   if (loading) return (

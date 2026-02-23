@@ -10,15 +10,21 @@ const ADMIN_EMAIL = "gavin.ranton@gmail.com";
 const NAV_ITEMS = [
   { label: "Dashboard",    href: "/dashboard" },
   { label: "New Scan",     href: "/scan" },
-  { label: "Scan History", href: "/scans" },
-  { label: "Reports",      href: "/reports" },
+  { label: "Scan History",  href: "/scans" },
+  { label: "Repositories",  href: "/repositories" },
+  { label: "Reports",       href: "/reports" },
   { label: "Account",     href: "/account" },
 ];
 
-function handleSignOut() {
-  fetch("/api/auth/logout", { method: "POST" }).then(() => {
-    window.location.href = "/";
+async function handleSignOut() {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } catch {}
+  // Clear all cookies client-side as fallback
+  document.cookie.split(";").forEach((c) => {
+    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
   });
+  window.location.replace("/login");
 }
 
 interface AppSidebarProps {
