@@ -451,17 +451,19 @@ export async function generateScanReport(scanId: string): Promise<Buffer> {
   // Launch Puppeteer and generate PDF
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: '/usr/bin/chromium-browser',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
+      '--no-zygote',
     ],
   });
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'domcontentloaded' });
     
     const pdf = await page.pdf({
       format: 'A4',
