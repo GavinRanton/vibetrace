@@ -452,27 +452,43 @@ export async function generateScanReport(scanId: string): Promise<Buffer> {
   const browser = await puppeteer.launch({
     headless: true,
     executablePath: '/snap/chromium/current/usr/lib/chromium-browser/chrome',
-    protocolTimeout: 120000,
+    protocolTimeout: 300000,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
       '--no-zygote',
-      '--single-process',
+      '--disable-extensions',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--hide-scrollbars',
+      '--metrics-recording-only',
+      '--mute-audio',
+      '--safebrowsing-disable-auto-update',
     ],
   });
 
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.setViewport({ width: 1200, height: 900 });
+    // Use goto with data URI — more reliable than setContent on restricted envs
+    const encoded = Buffer.from(html).toString('base64');
+    await page.goto('data:text/html;base64,' + encoded, {
+      waitUntil: 'domcontentloaded',
+      timeout: 120000,
+    });
+    // Small pause to let CSS render
+    await new Promise(r => setTimeout(r, 500));
     
     const pdf = await page.pdf({
       format: 'A4',
       margin: { top: '0', right: '0', bottom: '0', left: '0' },
       printBackground: true,
       displayHeaderFooter: false,
-      timeout: 60000,
+      timeout: 120000,
     });
 
     return Buffer.from(pdf);

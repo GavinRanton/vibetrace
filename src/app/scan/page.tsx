@@ -39,28 +39,12 @@ export default function ScanPage() {
 
   useEffect(() => {
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session?.provider_token) {
-        setPageState("no-token");
-        return;
-      }
-
       setPageState("loading-repos");
       try {
-        const res = await fetch("https://api.github.com/user/repos?sort=updated&per_page=50", {
-          headers: {
-            Authorization: `Bearer ${session.provider_token}`,
-            Accept: "application/vnd.github+json",
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch repositories from GitHub.");
-        }
-
-        const data: GitHubRepo[] = await res.json();
-        setRepos(data);
+        const res = await fetch("/api/github/repos", { cache: "no-store" });
+        if (!res.ok) throw new Error("Failed to fetch repositories.");
+        const data = await res.json();
+        setRepos(data.repos ?? []);
         setPageState("idle");
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Failed to load repositories.";
