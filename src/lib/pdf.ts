@@ -472,20 +472,7 @@ export async function generateScanReport(scanId: string): Promise<Buffer> {
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1200, height: 900 });
-    // Write HTML to temp file and load via file:// — avoids data URI size limits
-    const os = require('os');
-    const path = require('path');
-    const fs = require('fs');
-    const tmpFile = path.join(os.tmpdir(), `vt-report-${Date.now()}.html`);
-    fs.writeFileSync(tmpFile, html, 'utf8');
-    try {
-      await page.goto('file://' + tmpFile, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60000,
-      });
-    } finally {
-      fs.unlinkSync(tmpFile);
-    }
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
     
     const pdf = await page.pdf({
       format: 'A4',
