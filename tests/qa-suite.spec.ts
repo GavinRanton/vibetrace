@@ -37,10 +37,10 @@ test('nav: logo links to landing page not dashboard', async ({ page }) => {
   expect(href).not.toBe('/dashboard');
 });
 
-test('nav: sidebar contains Scan History not Repositories', async ({ page }) => {
+test('nav: sidebar contains Scan History and Repositories', async ({ page }) => {
   await loginAs(page);
   await expect(page.locator('text=Scan History')).toBeVisible();
-  await expect(page.locator('text=Repositories')).not.toBeVisible();
+  await expect(page.locator('text=Repositories')).toBeVisible();
 });
 
 test('nav: Reports link goes to /reports not /scans', async ({ page }) => {
