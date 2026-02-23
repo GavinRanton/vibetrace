@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import Link from "next/link";
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { ChevronUp, ChevronDown, ShieldCheck, User, LogOut, Menu } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ChevronUp, ChevronDown, ShieldCheck, User, LogOut, Menu, Copy, Check, PackageX } from "lucide-react";
 
 type Finding = {
   id: string;
   severity: string;
   category: string;
   file_path: string;
+  line_number?: number | null;
   plain_english: string;
   fix_prompt: string;
+  verification_step?: string | null;
   status: string;
   created_at: string;
 };
@@ -30,6 +32,7 @@ type DashboardData = {
   findings: Finding[];
   severity_counts: { critical: number; high: number; medium: number; low: number };
   last_scan_at: string | null;
+  user_email: string | null;
 };
 
 const severityConfig: Record<string, { color: string; bg: string; label: string }> = {
@@ -38,6 +41,10 @@ const severityConfig: Record<string, { color: string; bg: string; label: string 
   medium:   { color: "#3B82F6", bg: "rgba(59,130,246,0.1)", label: "Medium" },
   low:      { color: "#10B981", bg: "rgba(16,185,129,0.1)", label: "Low" },
 };
+
+function stripTmpPath(filePath: string): string {
+  return filePath.replace(/^.*vibetrace-scan-[^/]+\//, '');
+}
 
 function SortHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -55,6 +62,81 @@ function handleSignOut() {
   fetch('/api/auth/logout', { method: 'POST' }).then(() => {
     window.location.href = '/'
   })
+}
+
+function FixDrawer({ finding }: { finding: Finding }) {
+  const [copied, setCopied] = useState(false);
+  const cfg = severityConfig[finding.severity] ?? severityConfig['low'];
+  const displayPath = finding.file_path
+    ? `${stripTmpPath(finding.file_path)}${finding.line_number ? ':' + finding.line_number : ''}`
+    : null;
+
+  function handleCopy() {
+    navigator.clipboard.writeText(finding.fix_prompt ?? '').then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="ghost" className="text-[#3B82F6] hover:text-[#60A5FA] h-7 text-xs">
+          Fix →
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:w-[480px] bg-[#0D0D14] border-white/10 overflow-y-auto">
+        <SheetHeader className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <Badge
+              style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}30` }}
+            >
+              {cfg.label}
+            </Badge>
+            {displayPath && (
+              <span className="text-white/40 font-mono text-xs">{displayPath}</span>
+            )}
+          </div>
+          <SheetTitle className="text-white text-left text-base leading-snug">
+            {finding.plain_english}
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="space-y-6">
+          {/* Fix prompt */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider">Fix Prompt</h3>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleCopy}
+                className="h-7 text-xs text-white/60 hover:text-white gap-1.5"
+              >
+                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copied ? 'Copied!' : 'Copy'}
+              </Button>
+            </div>
+            <pre className="bg-white/[0.04] border border-white/10 rounded-md p-4 text-xs text-white/80 font-mono whitespace-pre-wrap break-words leading-relaxed">
+              {finding.fix_prompt || 'No fix prompt available.'}
+            </pre>
+          </div>
+
+          {/* Verification step */}
+          {finding.verification_step && (
+            <div>
+              <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">
+                How to verify the fix
+              </h3>
+              <p className="text-sm text-white/70 leading-relaxed">
+                {finding.verification_step}
+              </p>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 }
 
 function IssuesTable({ findings }: { findings: Finding[] }) {
@@ -93,6 +175,9 @@ function IssuesTable({ findings }: { findings: Finding[] }) {
           <tbody>
             {findings.map((issue) => {
               const cfg = severityConfig[issue.severity] ?? severityConfig['low'];
+              const displayPath = issue.file_path
+                ? stripTmpPath(issue.file_path) + (issue.line_number ? ':' + issue.line_number : '')
+                : '—';
               return (
                 <tr key={issue.id} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
                   <td className="px-6 py-4 w-[100px]">
@@ -110,23 +195,37 @@ function IssuesTable({ findings }: { findings: Finding[] }) {
                       )}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-white/40 font-mono text-xs w-[200px] truncate overflow-hidden max-w-[200px]">{issue.file_path}</td>
+                  <td className="px-6 py-4 text-white/70 font-mono text-xs w-[200px] truncate overflow-hidden max-w-[200px]">{displayPath}</td>
                   <td className="px-6 py-4 w-[140px] whitespace-nowrap">
-                    <span className="text-white/20 text-xs">—</span>
+                    <span className="text-white/70 text-xs">—</span>
                   </td>
-                  <td className="px-6 py-4 w-[120px] text-white/40 text-xs whitespace-nowrap">
+                  <td className="px-6 py-4 w-[120px] text-white/70 text-xs whitespace-nowrap">
                     {new Date(issue.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 w-[80px]">
-                    <Button size="sm" variant="ghost" className="text-[#3B82F6] hover:text-[#60A5FA] h-7 text-xs">
-                      Fix →
-                    </Button>
+                    <FixDrawer finding={issue} />
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DependenciesEmptyState() {
+  return (
+    <Card className="bg-white/[0.02] border-white/5">
+      <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
+        <PackageX className="w-12 h-12 text-white/20" />
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-white mb-1">No dependency scan data</h3>
+          <p className="text-white/40 text-sm max-w-xs">
+            Dependency scanning (SCA) analyses your package.json for known CVEs. Coming in a future update.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
@@ -177,19 +276,22 @@ function CheckoutBanner() {
   );
 }
 
-function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans, plan }: {
+const ADMIN_EMAIL = 'gavin.ranton@gmail.com';
+
+function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans, plan, userEmail }: {
   planLabel: string;
   scanCount: number;
   scansLimit: number;
   scanPct: number;
   lowOnScans: boolean;
   plan: string;
+  userEmail: string | null;
 }) {
   return (
     <>
       <div className="flex items-center gap-2 mb-8 px-2">
         <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-7 h-7" />
-        <Link href="/dashboard" className="font-semibold hover:text-white/80 transition-colors">VibeTrace</Link>
+        <Link href="/" className="font-semibold hover:text-white/80 transition-colors">VibeTrace</Link>
       </div>
       <nav className="flex flex-col gap-1 text-sm">
         {[
@@ -212,19 +314,13 @@ function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans, pla
           href="/scans"
           className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
         >
-          Repositories
+          Scan History
         </Link>
         <Link
-          href="/scans"
+          href="/reports"
           className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
         >
           Reports
-        </Link>
-        <Link
-          href="/account"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-        >
-          Settings
         </Link>
         <Link
           href="/account"
@@ -233,6 +329,14 @@ function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans, pla
           <User className="w-4 h-4" />
           Account
         </Link>
+        {userEmail === ADMIN_EMAIL && (
+          <Link
+            href="/admin"
+            className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
+          >
+            Admin
+          </Link>
+        )}
       </nav>
       <div className="mt-auto">
         <Separator className="bg-white/5 mb-4" />
@@ -314,6 +418,7 @@ export default function DashboardPage() {
     scanPct,
     lowOnScans,
     plan: data.plan,
+    userEmail: data.user_email,
   };
 
   return (
@@ -414,7 +519,7 @@ export default function DashboardPage() {
               </TabsContent>
               <TabsContent value="dependencies">
                 {dependencyFindings.length === 0 ? (
-                  <div className="text-white/40 text-center py-8">No dependency issues found.</div>
+                  <DependenciesEmptyState />
                 ) : (
                   <IssuesTable findings={dependencyFindings} />
                 )}
