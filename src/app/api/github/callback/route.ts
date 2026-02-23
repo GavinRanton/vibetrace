@@ -5,16 +5,19 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
   const state = searchParams.get('state')
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || ''
 
-  if (!code || !state) return NextResponse.redirect(`${siteUrl}/repositories?error=missing_params`)
+  if (!code || !state) return NextResponse.redirect(`${siteUrl}/dashboard`)
 
   let userId: string
+  let next = '/dashboard'
   try {
-    userId = JSON.parse(Buffer.from(state, 'base64url').toString()).userId
+    const parsed = JSON.parse(Buffer.from(state, 'base64url').toString())
+    userId = parsed.userId
+    if (parsed.next) next = parsed.next
     if (!userId) throw new Error('no userId')
   } catch {
-    return NextResponse.redirect(`${siteUrl}/repositories?error=invalid_state`)
+    return NextResponse.redirect(`${siteUrl}/dashboard`)
   }
 
   // Exchange code for token
@@ -30,7 +33,7 @@ export async function GET(req: NextRequest) {
   })
   const tokenData = await tokenRes.json()
   const accessToken: string = tokenData.access_token
-  if (!accessToken) return NextResponse.redirect(`${siteUrl}/repositories?error=token_exchange_failed`)
+  if (!accessToken) return NextResponse.redirect(`${siteUrl}/dashboard`)
 
   // Fetch GitHub username
   const ghUser = await fetch('https://api.github.com/user', {
@@ -43,6 +46,6 @@ export async function GET(req: NextRequest) {
     github_username: ghUser.login ?? null,
   }).eq('id', userId)
 
-  console.log(`[github/callback] Saved OAuth token for user ${userId} (${ghUser.login})`)
-  return NextResponse.redirect(`${siteUrl}/repositories?connected=1`)
+  console.log(`[github/callback] Saved token for user ${userId} (${ghUser.login})`)
+  return NextResponse.redirect(`${siteUrl}${next}`)
 }
