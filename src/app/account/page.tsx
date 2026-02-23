@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { AccountActions } from './AccountActions'
+import { GitHubTokenSection } from './GitHubTokenSection'
 
 export default async function AccountPage() {
   const supabase = await createServerSupabaseClient()
@@ -19,7 +20,7 @@ export default async function AccountPage() {
 
   const { data: userData } = await admin
     .from('users')
-    .select('plan')
+    .select('plan, github_access_token, github_username')
     .eq('id', user.id)
     .single()
 
@@ -29,6 +30,8 @@ export default async function AccountPage() {
     .eq('user_id', user.id)
 
   const plan: string = userData?.plan ?? 'free'
+  const hasGithubToken = !!userData?.github_access_token
+  const githubUsername: string | null = userData?.github_username ?? null
   const scansUsed = scanCount ?? 0
   const email = user.email ?? ''
   const initials = email.slice(0, 2).toUpperCase()
@@ -125,7 +128,17 @@ export default async function AccountPage() {
           </div>
         </section>
 
-        {/* Section 3: Data */}
+        {/* Section 3: GitHub */}
+        <section className="border border-white/5 rounded-xl bg-[#1E1E2E]/60 mb-6">
+          <div className="px-6 py-5 border-b border-white/5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[#94A3B8]">GitHub Integration</h2>
+          </div>
+          <div className="px-6 py-5">
+            <GitHubTokenSection hasToken={hasGithubToken} githubUsername={githubUsername} />
+          </div>
+        </section>
+
+        {/* Section 4: Data */}
         <section className="border border-white/5 rounded-xl bg-[#1E1E2E]/60">
           <div className="px-6 py-5 border-b border-white/5">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[#94A3B8]">Data</h2>
