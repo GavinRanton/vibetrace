@@ -17,6 +17,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No token provided" }, { status: 400 });
     }
 
+    // Reject GitHub App tokens (ghu_) — they have no repo scope and will overwrite good tokens
+    if (github_token.startsWith("ghu_")) {
+      return NextResponse.json({ error: "GitHub App token rejected" }, { status: 400 });
+    }
+
     const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,19 +41,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify the token is actually a valid GitHub token
+    // Verify token against GitHub API
     const ghRes = await fetch("https://api.github.com/user", {
       headers: { Authorization: `token ${github_token}`, "User-Agent": "vibetrace" },
     });
-    
+
     if (!ghRes.ok) {
       return NextResponse.json({ error: "Invalid GitHub token" }, { status: 400 });
     }
-    
+
+    // Only save if it has repo scope
+    const scopes = ghRes.headers.get("x-oauth-scopes") ?? "";
+    if (!scopes.includes("repo")) {
+      console.log("[save-github-token] Token missing repo scope, scopes:", scopes);
+      return NextResponse.json({ error: "Token missing repo scope" }, { status: 400 });
+    }
+
     const ghUser = await ghRes.json();
     const githubUsername = ghUser.login ?? null;
 
-    // Save to DB
     const { error: upsertError } = await adminClient.from("users").upsert({
       id: user.id,
       email: user.email ?? undefined,
