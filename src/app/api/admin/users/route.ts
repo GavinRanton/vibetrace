@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 
 const ADMIN_EMAIL = "gavin.ranton@gmail.com";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -19,7 +21,7 @@ export async function GET() {
     );
     const { data: { user }, error } = await authClient.auth.getUser();
     if (error || !user || user.email !== ADMIN_EMAIL) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
     }
 
     const db = createServerClient(
@@ -39,12 +41,12 @@ export async function GET() {
       .order("created_at", { ascending: false });
 
     if (usersError) {
-      return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to fetch users" }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
     }
 
-    return NextResponse.json({ users: users ?? [] });
+    return NextResponse.json({ users: users ?? [] }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err) {
     console.error("Admin users API error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
   }
 }
