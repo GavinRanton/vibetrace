@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
       .insert({
         repo_id: repoUuid,
         user_id: user.id,
-        status: deployed_url && !repo_full_name ? "dast_scanning" : "cloning",
+        status: "cloning",
         started_at: new Date().toISOString(),
       })
       .select()
