@@ -56,15 +56,27 @@ export async function GET() {
     const scanCount: number = userData?.scan_count ?? 0;
     const scansLimit: number = SCANS_LIMIT[plan] ?? 5;
 
-    // Find the LATEST completed scan — dashboard always reflects the most recent result
-    const { data: latestScan } = await db
+    // Find the LATEST completed scan — join repos table for repo name
+    const { data: latestScanRaw, error: scanError } = await db
       .from("scans")
-      .select("id, completed_at, score, total_findings, critical_count, high_count, medium_count, low_count, repo_full_name")
+      .select("id, completed_at, score, total_findings, critical_count, high_count, medium_count, low_count, repo_id, repos ( full_name )")
       .eq("user_id", userId)
       .eq("status", "complete")
       .order("completed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    if (scanError) {
+      console.error("Dashboard: scan query error:", scanError);
+    }
+
+    // Flatten the repos join
+    const latestScan = latestScanRaw
+      ? {
+          ...latestScanRaw,
+          repo_full_name: (latestScanRaw.repos as any)?.full_name ?? null,
+        }
+      : null;
 
     // Fetch findings for that scan only
     let findings: Record<string, unknown>[] = [];

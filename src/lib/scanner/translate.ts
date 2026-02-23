@@ -10,30 +10,31 @@ interface TranslatedFinding {
 const SYSTEM_PROMPT = `You are a security expert helping non-technical founders understand vulnerabilities in their vibe-coded apps (built with Lovable, Bolt.new, or Cursor).
 
 For each vulnerability, provide:
-1. **plain_english**: A clear, non-technical explanation of what the vulnerability means. Use analogies. Example: "This is like leaving your house keys under the doormat — anyone who knows where to look can get in."
-2. **business_impact**: What could happen to their users/business. Be specific but not fear-mongering. Use severity levels: Critical = "someone can access all your users data right now", High = "an attacker could exploit this with some effort", Medium = "this weakens your security posture", Low = "best practice improvement".
-3. **fix_prompt**: A complete message the user can copy and paste directly into Lovable, Cursor, or ChatGPT to fix their code. CRITICAL RULES:
-   - Do NOT mention file paths, line numbers, or server directories
-   - Do NOT use technical jargon the user would not understand
-   - Write it in first person as if the user is speaking to their AI tool
+1. **plain_english**: A clear, non-technical explanation. Use an analogy. Max 2 sentences.
+2. **business_impact**: What could actually happen. Be direct: Critical = "attackers can access all user data right now", High = "exploitable with moderate effort", Medium = "weakens security posture", Low = "best-practice improvement".
+3. **fix_prompt**: A complete, copy-pasteable prompt the user sends to Lovable, Cursor, or ChatGPT. STRICT RULES:
+   - NEVER mention file paths, line numbers, /tmp directories, or server-side locations
+   - NEVER use technical jargon the user wouldn't understand
+   - DO reference the actual vulnerable code pattern you can see in the code snippet
+   - Write as if the user is talking to their AI coding tool in first person
    - Start with: "In Lovable (or Cursor), paste this exactly:\n\""
-   - End with closing quote and period
-   - Be specific about WHAT the vulnerability is and HOW to fix it in plain language
-   - The prompt should work even if the user does not know which file has the issue
-4. **verification_step**: After applying the fix, what should they check to confirm it worked.
+   - End with closing quote
+   - Include: what the bug is, why it's dangerous, what specific code pattern to find, and what to replace it with
+   - Be specific enough that the AI tool can find and fix it without knowing the file name
+4. **verification_step**: Simple thing the user can check after the fix (no technical jargon).
 
-Examples of good fix_prompt output:
+GOOD fix_prompt examples:
 
-Example 1 (Hardcoded Secret):
-"In Lovable (or Cursor), paste this exactly:\n\"I have a critical security issue in my app. I have hardcoded an API key directly in my code as a variable called API_KEY. This is dangerous because anyone who sees my code can steal my API key. Please find all hardcoded secrets, API keys, passwords, and tokens in my server code and move them to environment variables using process.env.VARIABLE_NAME. Also make sure .env is listed in my .gitignore file so it never gets uploaded to GitHub.\""
+For hardcoded API key \`const API_KEY = "sk-abc123"\`:
+"In Lovable (or Cursor), paste this exactly:\n\"I have a critical security issue. I have hardcoded an API key directly in my code — you can see it as a variable like API_KEY or similar with a value starting with sk- or a long random string. This is dangerous because anyone who sees my code on GitHub can steal my API key and rack up charges on my account. Please find all hardcoded API keys, passwords, secrets, and tokens in my code and move them to environment variables using process.env.VARIABLE_NAME instead. Also make sure the .env file is in .gitignore so it never gets pushed to GitHub.\""
 
-Example 2 (SQL Injection):
-"In Lovable (or Cursor), paste this exactly:\n\"I have a SQL injection vulnerability in my app. My code is building database queries by joining strings together with user input, which lets attackers access or delete my entire database. Please find all places in my code where database queries are built using string concatenation or template literals with user input, and replace them with parameterised queries or a query builder that handles this safely.\""
+For SQL injection via string concat \`"SELECT * FROM users WHERE id = " + req.params.id\`:
+"In Lovable (or Cursor), paste this exactly:\n\"I have a SQL injection vulnerability. My code is building database queries by joining strings with user input — you'll see code like 'SELECT * FROM users WHERE id = ' + someUserInput or similar string concatenation in database queries. This lets attackers manipulate the query to read, change, or delete my entire database. Please find all database queries that use string concatenation or template literals with user-provided values and replace them with parameterised queries (using ? placeholders or $1, $2 style) so user input is never directly embedded in SQL.\""
 
-Example 3 (eval with user input):
-"In Lovable (or Cursor), paste this exactly:\n\"I have a critical security vulnerability where my code uses eval() to run code from user input. This lets attackers execute any code they want on my server. Please find and remove all uses of eval() in my code and replace them with safe alternatives — JSON.parse() for JSON data, or ask me what the eval() is trying to do so we can find a safer way.\""
+For eval with user input \`eval(req.body.code)\`:
+"In Lovable (or Cursor), paste this exactly:\n\"I have a critical security vulnerability. My server code is using eval() to run code that comes from user input — you'll see something like eval(userInput) or eval(req.body.something). This means any visitor to my site can execute any code they want on my server, including stealing all data or taking over the server. Please remove all uses of eval() that involve user-provided input. If it's parsing JSON, use JSON.parse() instead. If it's doing something else, ask me what it's supposed to do and suggest a safe alternative.\""
 
-Respond in JSON format only. No markdown, no explanation outside the JSON.`;
+Respond in JSON format only — a JSON array. No markdown, no explanation outside the JSON.`;
 
 export async function translateFindings(
   findings: SemgrepFinding[],
@@ -46,14 +47,16 @@ export async function translateFindings(
   for (let i = 0; i < findings.length; i += batchSize) {
     const batch = findings.slice(i, i + batchSize);
     
-    const prompt = batch.map((f, idx) => `
-Finding ${idx + 1}:
-- Rule: ${f.check_id}
-- File: ${f.path.replace(/^.*vibetrace-scan-[^\/]+\//, '')}:${f.start.line}
+    const prompt = batch.map((f, idx) => {
+      // Strip the /tmp/vibetrace-scan-XXX/ prefix — only show the relative file name
+      const relPath = f.path.replace(/^.*vibetrace-scan-[^\/]+\//, '');
+      return `Finding ${idx + 1}:
+- Rule ID: ${f.check_id}
 - Severity: ${f.extra.severity}
-- Message: ${f.extra.message}
-- Code: ${f.extra.lines}
-`).join("\n---\n");
+- Description: ${f.extra.message}
+- Vulnerable code snippet: ${f.extra.lines?.trim() || '(no snippet)'}
+- File: ${relPath} (do NOT include this path in fix_prompt)`;
+    }).join("\n---\n");
 
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -64,18 +67,19 @@ Finding ${idx + 1}:
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-5-20250514",
+          model: "claude-sonnet-4-5",
           max_tokens: 4096,
           system: SYSTEM_PROMPT,
           messages: [{
             role: "user",
-            content: `Translate these ${batch.length} security findings into plain English for a non-technical founder. Return a JSON array with objects containing: plain_english, business_impact, fix_prompt, verification_step.\n\n${prompt}`,
+            content: `Translate these ${batch.length} security findings. For each fix_prompt, reference the ACTUAL vulnerable code snippet I've provided so the user's AI tool can find it — but NEVER include the file path.\n\nReturn a JSON array with objects: plain_english, business_impact, fix_prompt, verification_step.\n\n${prompt}`,
           }],
         }),
       });
 
       if (!response.ok) {
-        console.error(`Claude API error: ${response.status}`);
+        const err = await response.text();
+        console.error(`Claude API error: ${response.status} — ${err}`);
         continue;
       }
 

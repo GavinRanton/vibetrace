@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -8,9 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Menu, GitBranch, ScanLine, Lock } from "lucide-react";
+import { Menu, GitBranch, ScanLine, Lock, RefreshCw } from "lucide-react";
 
-type Repo = {
+type DbRepo = {
   id: string;
   full_name: string;
   name: string;
@@ -18,6 +19,25 @@ type Repo = {
   last_scanned_at: string | null;
   created_at: string;
   scan_count: number;
+};
+
+type GhRepo = {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  default_branch: string;
+  updated_at: string;
+};
+
+type MergedRepo = {
+  db_id: string | null;
+  full_name: string;
+  name: string;
+  is_private: boolean;
+  last_scanned_at: string | null;
+  scan_count: number;
+  default_branch: string;
 };
 
 type DashData = {
@@ -29,41 +49,126 @@ type DashData = {
 
 export default function RepositoriesPage() {
   const router = useRouter();
-  const [repos, setRepos] = useState<Repo[]>([]);
+  const [repos, setRepos] = useState<MergedRepo[]>([]);
   const [dashData, setDashData] = useState<DashData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scanningRepoId, setScanningRepoId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [scanningRepo, setScanningRepo] = useState<string | null>(null);
+  const [githubToken, setGithubToken] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/repositories").then((r) => r.json()),
-      fetch("/api/dashboard").then((r) => r.json()),
-    ]).then(([repoData, dash]) => {
-      setRepos(repoData.repos ?? []);
-      setDashData(dash);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
-  async function handleScan(repo: Repo) {
-    setScanningRepoId(repo.id);
+  async function loadData(showSyncing = false) {
+    if (showSyncing) setSyncing(true);
+    else setLoading(true);
     try {
+      // Get GitHub token from session
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.provider_token ?? null;
+      setGithubToken(token);
+
+      // Load DB repos and dashboard data in parallel
+      const [repoRes, dashRes] = await Promise.all([
+        fetch("/api/repositories"),
+        fetch("/api/dashboard"),
+      ]);
+      const [repoData, dash] = await Promise.all([
+        repoRes.json(),
+        dashRes.json(),
+      ]);
+      setDashData(dash);
+
+      const dbRepos: DbRepo[] = repoData.repos ?? [];
+      const dbMap = new Map(dbRepos.map((r) => [r.full_name, r]));
+
+      // If we have a GitHub token, also fetch all GitHub repos (including private)
+      let merged: MergedRepo[] = dbRepos.map((r) => ({
+        db_id: r.id,
+        full_name: r.full_name,
+        name: r.name,
+        is_private: r.is_private,
+        last_scanned_at: r.last_scanned_at,
+        scan_count: r.scan_count,
+        default_branch: "main",
+      }));
+
+      if (token) {
+        const ghRes = await fetch("/api/github/repos", { cache: "no-store" });
+        if (ghRes.ok) {
+          const ghData = await ghRes.json();
+          const ghRepos: GhRepo[] = ghData.repos ?? [];
+
+          // Add any GitHub repos not yet in DB
+          for (const ghRepo of ghRepos) {
+            if (!dbMap.has(ghRepo.full_name)) {
+              merged.push({
+                db_id: null,
+                full_name: ghRepo.full_name,
+                name: ghRepo.name,
+                is_private: ghRepo.private,
+                last_scanned_at: null,
+                scan_count: 0,
+                default_branch: ghRepo.default_branch,
+              });
+            } else {
+              // Update is_private from GitHub (DB might be stale)
+              const existing = merged.find((m) => m.full_name === ghRepo.full_name);
+              if (existing) existing.is_private = ghRepo.private;
+            }
+          }
+        }
+      }
+
+      // Sort: most recently scanned first, then alphabetical
+      merged.sort((a, b) => {
+        if (a.last_scanned_at && b.last_scanned_at) {
+          return new Date(b.last_scanned_at).getTime() - new Date(a.last_scanned_at).getTime();
+        }
+        if (a.last_scanned_at) return -1;
+        if (b.last_scanned_at) return 1;
+        return a.full_name.localeCompare(b.full_name);
+      });
+
+      setRepos(merged);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setSyncing(false);
+    }
+  }
+
+  useEffect(() => { loadData(); }, []);
+
+  async function handleScan(repo: MergedRepo) {
+    setScanningRepo(repo.full_name);
+    try {
+      const body: Record<string, unknown> = {
+        repo_full_name: repo.full_name,
+        repo_id: repo.db_id ?? undefined,
+      };
+      // Always send github_token so private repos work
+      if (githubToken) body.github_token = githubToken;
+
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo_full_name: repo.full_name }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         const { scan_id } = await res.json();
         router.push(`/scans?id=${scan_id}`);
       } else {
-        // If the POST fails (e.g. needs github token), redirect to scan page instead
+        // Needs re-auth — redirect to scan page
         router.push(`/scan`);
       }
     } catch {
       router.push(`/scan`);
     } finally {
-      setScanningRepoId(null);
+      setScanningRepo(null);
     }
   }
 
@@ -78,7 +183,7 @@ export default function RepositoriesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
-        <div className="text-white/40">Loading...</div>
+        <div className="text-white/40">Loading repositories…</div>
       </div>
     );
   }
@@ -115,12 +220,27 @@ export default function RepositoriesPage() {
               <div>
                 <h1 className="text-2xl font-bold">Repositories</h1>
                 <p className="text-white/40 text-sm mt-1">
-                  {repos.length} connected repositor{repos.length !== 1 ? "ies" : "y"}
+                  {repos.length} repositor{repos.length !== 1 ? "ies" : "y"} connected
+                  {!githubToken && (
+                    <span className="ml-2 text-amber-400/70">· Sign in again to see private repos</span>
+                  )}
                 </p>
               </div>
-              <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white" asChild>
-                <Link href="/scan">+ New Scan</Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => loadData(true)}
+                  disabled={syncing}
+                  className="text-white/40 hover:text-white/70 gap-1.5"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Syncing…" : "Sync"}
+                </Button>
+                <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white" asChild>
+                  <Link href="/scan">+ New Scan</Link>
+                </Button>
+              </div>
             </div>
 
             {repos.length === 0 ? (
@@ -128,7 +248,7 @@ export default function RepositoriesPage() {
                 <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
                   <GitBranch className="w-12 h-12 text-white/20" />
                   <div className="text-center">
-                    <h3 className="text-lg font-semibold text-white mb-1">No repositories yet</h3>
+                    <h3 className="text-lg font-semibold text-white mb-1">No repositories found</h3>
                     <p className="text-white/40 text-sm">Run your first scan to connect a repository.</p>
                   </div>
                   <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white mt-2" asChild>
@@ -151,21 +271,20 @@ export default function RepositoriesPage() {
                     <tbody>
                       {repos.map((repo) => (
                         <tr
-                          key={repo.id}
+                          key={repo.full_name}
                           className="border-b border-white/5 hover:bg-white/[0.03] transition-colors last:border-0"
                         >
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <GitBranch className="w-4 h-4 text-white/30 shrink-0" />
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-white/80 font-mono text-sm">
-                                    {repo.full_name}
+                              <div className="flex items-center gap-2">
+                                <span className="text-white/80 font-mono text-sm">{repo.full_name}</span>
+                                {repo.is_private && (
+                                  <span className="flex items-center gap-1 text-white/30 text-xs">
+                                    <Lock className="w-3 h-3" />
+                                    private
                                   </span>
-                                  {repo.is_private && (
-                                    <Lock className="w-3 h-3 text-white/30" />
-                                  )}
-                                </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -186,11 +305,11 @@ export default function RepositoriesPage() {
                             <Button
                               size="sm"
                               onClick={() => handleScan(repo)}
-                              disabled={scanningRepoId === repo.id}
+                              disabled={scanningRepo === repo.full_name}
                               className="bg-[#3B82F6] hover:bg-[#2563EB] text-white h-8 text-xs gap-1.5"
                             >
                               <ScanLine className="w-3.5 h-3.5" />
-                              {scanningRepoId === repo.id ? "Starting…" : "Run Scan"}
+                              {scanningRepo === repo.full_name ? "Starting…" : "Run Scan"}
                             </Button>
                           </td>
                         </tr>
