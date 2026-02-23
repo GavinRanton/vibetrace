@@ -17,8 +17,10 @@ type Finding = {
   severity: string;
   category: string;
   file_path: string;
+  rule_id?: string | null;
   line_number?: number | null;
   plain_english: string;
+  actual_error?: string | null;
   fix_prompt?: string | null;
   verification_step?: string | null;
   status: string;
@@ -76,11 +78,23 @@ function FixDrawer({ finding }: { finding: Finding }) {
             {loc && <span className="text-white/40 font-mono text-xs">{loc}</span>}
           </div>
           <SheetTitle className="text-white text-left text-base leading-snug">
-            {finding.plain_english || 'Security vulnerability detected'}
+            {finding.rule_id || 'Security vulnerability detected'}
           </SheetTitle>
         </SheetHeader>
 
         <div className="flex flex-col gap-6 overflow-y-auto">
+          <div>
+            <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Actual error</h3>
+            <pre className="bg-white/[0.04] border border-white/10 rounded-md p-4 text-xs text-white/70 font-mono whitespace-pre-wrap break-words leading-relaxed">
+              {finding.actual_error || 'Raw scanner output unavailable for this finding.'}
+            </pre>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Plain-English explanation</h3>
+            <p className="text-sm text-white/80 leading-relaxed">{finding.plain_english}</p>
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider">Fix Prompt</h3>

@@ -8,6 +8,45 @@ const SCANS_LIMIT: Record<string, number> = {
   pro: 999,
 };
 
+function stripHtml(input: string): string {
+  return (input || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildActualError(f: any): string {
+  const parts: string[] = [];
+
+  if (f.rule_id) parts.push(`Rule: ${f.rule_id}`);
+
+  const loc = f.file_path
+    ? `${f.file_path}${f.line_number ? `:${f.line_number}` : ""}`
+    : null;
+  if (loc) parts.push(`Location: ${loc}`);
+
+  const ro = f.raw_output;
+  const semgrepMsg = ro?.extra?.message || ro?.message;
+  if (semgrepMsg) parts.push(`Message: ${String(semgrepMsg).trim()}`);
+
+  const zapName = ro?.name;
+  const zapRisk = ro?.riskdesc || ro?.risk;
+  if (zapName) parts.push(`ZAP: ${stripHtml(String(zapName))}${zapRisk ? ` — ${stripHtml(String(zapRisk))}` : ""}`);
+  if (ro?.desc) parts.push(`Description: ${stripHtml(String(ro.desc))}`);
+  if (ro?.evidence) parts.push(`Evidence: ${stripHtml(String(ro.evidence))}`);
+  if (ro?.solution) parts.push(`Suggested fix: ${stripHtml(String(ro.solution))}`);
+
+  if (f.code_snippet) parts.push(`Snippet:\n${String(f.code_snippet).trim()}`);
+
+  const out = parts.filter(Boolean).join("\n\n").trim();
+  return out.length > 8000 ? out.slice(0, 8000) + "…" : out;
+}
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -85,11 +124,14 @@ export async function GET() {
     if (latestScan) {
       const { data: findingsData } = await db
         .from("findings")
-        .select("id, severity, category, file_path, line_number, plain_english, fix_prompt, verification_step, status, created_at")
+        .select("id, severity, category, rule_id, file_path, line_number, code_snippet, raw_output, plain_english, fix_prompt, verification_step, status, created_at")
         .eq("scan_id", latestScan.id)
         .order("severity", { ascending: true });
 
-      findings = findingsData ?? [];
+      findings = (findingsData ?? []).map((f: any) => ({
+        ...f,
+        actual_error: buildActualError(f),
+      }));
 
       // Use scan-level counts if available, otherwise compute from findings
       if (latestScan.critical_count !== null) {

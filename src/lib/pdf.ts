@@ -52,6 +52,7 @@ interface Finding {
   file_path: string;
   line_number: number;
   code_snippet: string;
+  raw_output: any;
   plain_english: string;
   business_impact: string;
   fix_prompt: string;
@@ -86,6 +87,46 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
   const mediumFindings = findings.filter(f => f.severity === 'medium');
   const lowFindings = findings.filter(f => f.severity === 'low');
 
+
+
+  function stripHtml(input: string): string {
+    return (input || "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function buildActualErrorText(f: Finding): string {
+    const parts: string[] = [];
+    if ((f as any).rule_id) parts.push(`Rule: ${(f as any).rule_id}`);
+
+    const loc = f.file_path
+      ? `${f.file_path}${f.line_number ? `:${f.line_number}` : ""}`
+      : null;
+    if (loc) parts.push(`Location: ${loc}`);
+
+    const ro: any = (f as any).raw_output;
+    const semgrepMsg = ro?.extra?.message || ro?.message;
+    if (semgrepMsg) parts.push(`Message: ${String(semgrepMsg).trim()}`);
+
+    const zapName = ro?.name;
+    const zapRisk = ro?.riskdesc || ro?.risk;
+    if (zapName) parts.push(`ZAP: ${stripHtml(String(zapName))}${zapRisk ? ` — ${stripHtml(String(zapRisk))}` : ""}`);
+    if (ro?.desc) parts.push(`Description: ${stripHtml(String(ro.desc))}`);
+    if (ro?.evidence) parts.push(`Evidence: ${stripHtml(String(ro.evidence))}`);
+    if (ro?.solution) parts.push(`Suggested fix: ${stripHtml(String(ro.solution))}`);
+
+    if (f.code_snippet) parts.push(`Snippet:\n${String(f.code_snippet).trim()}`);
+
+    const out = parts.filter(Boolean).join("\n\n").trim();
+    return out.length > 8000 ? out.slice(0, 8000) + "…" : out;
+  }
+
   const renderFindingGroup = (label: string, color: string, bg: string, items: Finding[]) => {
     if (items.length === 0) return '';
     return `
@@ -105,6 +146,10 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
               ${f.line_number ? `<span class="line-num">Line ${f.line_number}</span>` : ''}
             </div>
             ${f.code_snippet ? `<pre class="code-snippet">${escapeHtml(f.code_snippet)}</pre>` : ''}
+            <div class="finding-section">
+              <h4>Actual error</h4>
+              <pre class="actual-error">${escapeHtml(buildActualErrorText(f))}</pre>
+            </div>
             <div class="finding-section">
               <h4>What this means</h4>
               <p>${escapeHtml(f.plain_english || '')}</p>
@@ -253,6 +298,19 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
     word-break: break-all;
     margin-bottom: 14px;
     max-height: 120px;
+  }
+
+  .actual-error {
+    background: #0B1220;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+    color: #94A3B8;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-top: 6px;
   }
   .finding-section { margin-bottom: 10px; }
   .finding-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748B; margin-bottom: 4px; }

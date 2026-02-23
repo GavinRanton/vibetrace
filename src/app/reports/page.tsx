@@ -13,6 +13,7 @@ type Finding = {
   id: string;
   severity: string;
   plain_english: string;
+  actual_error: string;
   fix_prompt: string | null;
   verification_step: string | null;
   file_path: string;
@@ -130,7 +131,17 @@ function ScanReportRow({ scan }: { scan: Scan }) {
                         </Badge>
                         {loc && <span className="text-white/40 font-mono text-xs self-center">{loc}</span>}
                       </div>
-                      <p className="text-white/80 text-sm">{f.plain_english}</p>
+                      <div>
+                        <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-2">Actual error</p>
+                        <pre className="bg-black/30 border border-white/10 rounded p-3 text-xs text-white/70 font-mono whitespace-pre-wrap break-words leading-relaxed">
+                          {f.actual_error || "Raw scanner output unavailable."}
+                        </pre>
+                      </div>
+
+                      <div>
+                        <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-1">Plain-English explanation</p>
+                        <p className="text-white/80 text-sm">{f.plain_english}</p>
+                      </div>
                       {f.fix_prompt && (
                         <div>
                           <p className="text-white/40 text-xs uppercase tracking-wider font-semibold mb-2">Fix Prompt</p>

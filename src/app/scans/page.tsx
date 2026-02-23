@@ -45,6 +45,7 @@ type Finding = {
   file_path: string;
   line_number: number | null;
   plain_english: string;
+  actual_error: string;
   fix_prompt: string;
   status: string;
   created_at: string;
@@ -419,6 +420,7 @@ function FindingsPanel({
                 </Badge>
                 <div className="min-w-0 flex-1">
                   <p className="text-white/80 text-sm">{f.plain_english}</p>
+                  <pre className="mt-2 bg-black/30 border border-white/10 rounded p-2 text-[11px] text-white/60 font-mono whitespace-pre-wrap break-words leading-relaxed max-h-20 overflow-hidden">{f.actual_error}</pre>
                   <p className="text-white/30 text-xs font-mono mt-1 truncate">
                     {f.file_path}
                     {f.line_number ? `:${f.line_number}` : ""}
