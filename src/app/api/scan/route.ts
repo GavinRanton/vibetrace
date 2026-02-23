@@ -172,16 +172,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Provide a repository or deployed URL" }, { status: 400 });
     }
 
-    // Prefer token sent explicitly from client (provider_token is not reliably
-    // available via server-side getSession() behind Cloudflare/SSR proxy).
-    let githubToken = bodyToken ?? session?.provider_token ?? null;
-    if (!githubToken) {
-      const { data: userData } = await adminClient
-        .from("users")
-        .select("github_access_token")
-        .eq("id", user.id)
-        .single();
-      githubToken = userData?.github_access_token ?? null;
+    // DB token takes priority — it's the proper gho_ OAuth token with repo scope.
+    // session.provider_token is a ghu_ GitHub App token with no repo scope — skip it.
+    const { data: userData } = await adminClient
+      .from("users")
+      .select("github_access_token")
+      .eq("id", user.id)
+      .single();
+    const dbToken = userData?.github_access_token;
+    // Only use DB token if it's a proper OAuth token (gho_); never use ghu_ tokens
+    let githubToken: string | null = null;
+    if (dbToken && !dbToken.startsWith('ghu_')) {
+      githubToken = dbToken;
+    } else if (bodyToken && !bodyToken.startsWith('ghu_')) {
+      githubToken = bodyToken;
     }
     if (!githubToken && repo_id) {
       return NextResponse.json({ error: "No GitHub token — please re-authenticate" }, { status: 401 });
