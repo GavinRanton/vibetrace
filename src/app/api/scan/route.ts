@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import type { NextRequest } from "next/server";
 import { exec as execCb } from "child_process";
 import { promisify } from "util";
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Run scan asynchronously (respond immediately, process in background)
-    processScan(scan.id, repo_full_name ?? null, githubToken ?? null, user.id, repoUuid, deployed_url);
+    after(() => processScan(scan.id, repo_full_name ?? null, githubToken ?? null, user.id, repoUuid, deployed_url));
 
     return NextResponse.json({ scan_id: scan.id, status: "started" });
   } catch (error: any) {
@@ -258,6 +258,7 @@ async function processScan(
 
       // Run Semgrep
       await adminClient.from("scans").update({ status: "scanning" }).eq("id", scanId);
+      console.log('[SEMGREP] starting scan on', repoPath);
       const scanResult = await runSemgrepScan(repoPath);
 
       // Translate findings with Claude
