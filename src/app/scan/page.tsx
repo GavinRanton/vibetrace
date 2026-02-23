@@ -223,7 +223,7 @@ export default function ScanPage() {
                 </div>
 
                 {/* Repo list */}
-                <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
+                <div className="max-h-[480px] overflow-y-auto space-y-1 pr-1">
                   {filteredRepos.length === 0 ? (
                     <p className="text-white/30 text-sm text-center py-6">No repositories found.</p>
                   ) : (

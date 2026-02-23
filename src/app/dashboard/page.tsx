@@ -6,19 +6,20 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { ChevronUp, ChevronDown, ShieldCheck, User, LogOut, Menu } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { AppSidebar } from "@/components/app-sidebar";
+import { ChevronUp, ChevronDown, ShieldCheck, Menu, Copy, Check, PackageX } from "lucide-react";
 
 type Finding = {
   id: string;
   severity: string;
   category: string;
   file_path: string;
+  line_number?: number | null;
   plain_english: string;
-  fix_prompt: string;
+  fix_prompt?: string | null;
+  verification_step?: string | null;
   status: string;
   created_at: string;
 };
@@ -30,97 +31,135 @@ type DashboardData = {
   findings: Finding[];
   severity_counts: { critical: number; high: number; medium: number; low: number };
   last_scan_at: string | null;
+  user_email: string | null;
 };
 
-const severityConfig: Record<string, { color: string; bg: string; label: string }> = {
-  critical: { color: "#EF4444", bg: "rgba(239,68,68,0.1)", label: "Critical" },
-  high:     { color: "#F59E0B", bg: "rgba(245,158,11,0.1)", label: "High" },
-  medium:   { color: "#3B82F6", bg: "rgba(59,130,246,0.1)", label: "Medium" },
-  low:      { color: "#10B981", bg: "rgba(16,185,129,0.1)", label: "Low" },
+const SEV: Record<string, { color: string; bg: string; label: string }> = {
+  critical: { color: "#EF4444", bg: "rgba(239,68,68,0.1)",  label: "Critical" },
+  high:     { color: "#F59E0B", bg: "rgba(245,158,11,0.1)", label: "High"     },
+  medium:   { color: "#3B82F6", bg: "rgba(59,130,246,0.1)", label: "Medium"   },
+  low:      { color: "#10B981", bg: "rgba(16,185,129,0.1)", label: "Low"      },
 };
 
-function SortHeader({ children }: { children: React.ReactNode }) {
+function stripPath(p: string) {
+  return p.replace(/^.*vibetrace-scan-[^/]+\//, '');
+}
+
+function FixDrawer({ finding }: { finding: Finding }) {
+  const [copied, setCopied] = useState(false);
+  const cfg = SEV[finding.severity] ?? SEV.low;
+  const loc = finding.file_path
+    ? stripPath(finding.file_path) + (finding.line_number ? ':' + finding.line_number : '')
+    : null;
+
+  function copy() {
+    navigator.clipboard.writeText(finding.fix_prompt ?? '').then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
   return (
-    <div className="flex items-center gap-1">
-      {children}
-      <span className="flex flex-col opacity-30">
-        <ChevronUp className="w-3 h-3 -mb-1" />
-        <ChevronDown className="w-3 h-3" />
-      </span>
-    </div>
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button size="sm" variant="ghost" className="text-[#3B82F6] hover:text-[#60A5FA] h-7 text-xs px-2">
+          Fix →
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:w-[500px] bg-[#0D0D14] border-white/10 overflow-y-auto flex flex-col gap-0">
+        <SheetHeader className="mb-6 shrink-0">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
+            <Badge style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}30` }}>
+              {cfg.label}
+            </Badge>
+            {loc && <span className="text-white/40 font-mono text-xs">{loc}</span>}
+          </div>
+          <SheetTitle className="text-white text-left text-base leading-snug">
+            {finding.plain_english || 'Security vulnerability detected'}
+          </SheetTitle>
+        </SheetHeader>
+
+        <div className="flex flex-col gap-6 overflow-y-auto">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider">Fix Prompt</h3>
+              <Button
+                size="sm" variant="ghost" onClick={copy}
+                className="h-7 text-xs text-white/50 hover:text-white gap-1.5"
+              >
+                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copied ? 'Copied!' : 'Copy'}
+              </Button>
+            </div>
+            {finding.fix_prompt ? (
+              <pre className="bg-white/[0.04] border border-white/10 rounded-md p-4 text-xs text-white/80 font-mono whitespace-pre-wrap break-words leading-relaxed">
+                {finding.fix_prompt}
+              </pre>
+            ) : (
+              <p className="text-white/30 text-sm italic">
+                Fix prompt not available — run a new scan to generate updated prompts.
+              </p>
+            )}
+          </div>
+
+          {finding.verification_step && (
+            <div>
+              <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">
+                How to verify
+              </h3>
+              <p className="text-sm text-white/70 leading-relaxed">{finding.verification_step}</p>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
-function handleSignOut() {
-  fetch('/api/auth/logout', { method: 'POST' }).then(() => {
-    window.location.href = '/'
-  })
+function SortIcon() {
+  return (
+    <span className="inline-flex flex-col opacity-30 ml-1">
+      <ChevronUp className="w-3 h-3 -mb-1" />
+      <ChevronDown className="w-3 h-3" />
+    </span>
+  );
 }
 
 function IssuesTable({ findings }: { findings: Finding[] }) {
+  if (findings.length === 0) return null;
   return (
-    <Card className="bg-white/[0.02] border-white/5">
-      <CardContent className="p-0">
-        <table className="w-full text-sm table-fixed">
-          <colgroup>
-            <col className="w-[100px]" />
-            <col className="w-auto" style={{ minWidth: "250px" }} />
-            <col className="w-[200px]" />
-            <col className="w-[140px]" />
-            <col className="w-[120px]" />
-            <col className="w-[80px]" />
-          </colgroup>
+    <Card className="bg-white/[0.02] border-white/5 overflow-hidden">
+      <CardContent className="p-0 overflow-x-auto">
+        <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="border-b border-white/5 text-white/40">
-              <th className="text-left px-6 py-3 font-medium w-[100px]">
-                <SortHeader>Severity</SortHeader>
-              </th>
-              <th className="text-left px-6 py-3 font-medium" style={{ minWidth: "250px" }}>
-                <SortHeader>Issue</SortHeader>
-              </th>
-              <th className="text-left px-6 py-3 font-medium w-[200px]">
-                <SortHeader>Location</SortHeader>
-              </th>
-              <th className="text-left px-6 py-3 font-medium w-[140px]">
-                <SortHeader>CVE</SortHeader>
-              </th>
-              <th className="text-left px-6 py-3 font-medium w-[120px]">
-                <SortHeader>Discovered</SortHeader>
-              </th>
-              <th className="text-left px-6 py-3 font-medium w-[80px]">Action</th>
+              <th className="text-left px-5 py-3 font-medium w-24">Severity<SortIcon /></th>
+              <th className="text-left px-5 py-3 font-medium">Issue<SortIcon /></th>
+              <th className="text-left px-5 py-3 font-medium w-44">Location<SortIcon /></th>
+              <th className="text-left px-5 py-3 font-medium w-28">Discovered<SortIcon /></th>
+              <th className="text-left px-5 py-3 font-medium w-20">Action</th>
             </tr>
           </thead>
           <tbody>
-            {findings.map((issue) => {
-              const cfg = severityConfig[issue.severity] ?? severityConfig['low'];
+            {findings.map((f) => {
+              const cfg = SEV[f.severity] ?? SEV.low;
+              const loc = f.file_path
+                ? stripPath(f.file_path) + (f.line_number ? ':' + f.line_number : '')
+                : '—';
               return (
-                <tr key={issue.id} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
-                  <td className="px-6 py-4 w-[100px]">
-                    <Badge
-                      style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}30` }}
-                    >
+                <tr key={f.id} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors last:border-0">
+                  <td className="px-5 py-4">
+                    <Badge style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}30` }}>
                       {cfg.label}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 text-white/80 font-medium" style={{ minWidth: "250px" }}>
-                    <span className="inline-flex items-center gap-1 flex-wrap">
-                      {issue.plain_english}
-                      {issue.category === 'dast' && (
-                        <span className="ml-1 text-xs px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">DAST</span>
-                      )}
-                    </span>
+                  <td className="px-5 py-4 text-white/80">{f.plain_english}</td>
+                  <td className="px-5 py-4 text-white/70 font-mono text-xs truncate max-w-[176px]">{loc}</td>
+                  <td className="px-5 py-4 text-white/60 text-xs whitespace-nowrap">
+                    {new Date(f.created_at).toLocaleDateString('en-GB')}
                   </td>
-                  <td className="px-6 py-4 text-white/40 font-mono text-xs w-[200px] truncate overflow-hidden max-w-[200px]">{issue.file_path}</td>
-                  <td className="px-6 py-4 w-[140px] whitespace-nowrap">
-                    <span className="text-white/20 text-xs">—</span>
-                  </td>
-                  <td className="px-6 py-4 w-[120px] text-white/40 text-xs whitespace-nowrap">
-                    {new Date(issue.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 w-[80px]">
-                    <Button size="sm" variant="ghost" className="text-[#3B82F6] hover:text-[#60A5FA] h-7 text-xs">
-                      Fix →
-                    </Button>
+                  <td className="px-5 py-4">
+                    <FixDrawer finding={f} />
                   </td>
                 </tr>
               );
@@ -132,14 +171,14 @@ function IssuesTable({ findings }: { findings: Finding[] }) {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
+function EmptyNoScans() {
   return (
     <Card className="bg-white/[0.02] border-white/5">
       <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
-        <ShieldCheck className="w-12 h-12 text-[#10B981]" />
+        <ShieldCheck className="w-12 h-12 text-[#3B82F6]" />
         <div className="text-center">
           <h3 className="text-lg font-semibold text-white mb-1">No scans yet</h3>
-          <p className="text-white/40 text-sm">{message}</p>
+          <p className="text-white/40 text-sm">Run your first scan to see security findings.</p>
         </div>
         <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white mt-2" asChild>
           <Link href="/scan">New Scan</Link>
@@ -149,14 +188,14 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function CleanState() {
+function EmptyClean() {
   return (
     <Card className="bg-white/[0.02] border-white/5">
       <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
         <ShieldCheck className="w-12 h-12 text-[#10B981]" />
         <div className="text-center">
-          <h3 className="text-lg font-semibold text-white mb-1">Latest scan clean</h3>
-          <p className="text-white/40 text-sm">Score 100 — No vulnerabilities detected</p>
+          <h3 className="text-lg font-semibold text-white mb-1">All clear</h3>
+          <p className="text-white/40 text-sm">Your last scan found no vulnerabilities.</p>
         </div>
         <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white mt-2" asChild>
           <Link href="/scan">Run Another Scan</Link>
@@ -167,97 +206,12 @@ function CleanState() {
 }
 
 function CheckoutBanner() {
-  const searchParams = useSearchParams();
-  const checkoutSuccess = searchParams.get('checkout') === 'success';
-  if (!checkoutSuccess) return null;
+  const sp = useSearchParams();
+  if (sp.get('checkout') !== 'success') return null;
   return (
     <div className="w-full bg-green-600 text-white text-center py-3 px-4 text-sm font-medium">
       🎉 Payment successful! Your plan has been upgraded.
     </div>
-  );
-}
-
-function SidebarNav({ planLabel, scanCount, scansLimit, scanPct, lowOnScans, plan }: {
-  planLabel: string;
-  scanCount: number;
-  scansLimit: number;
-  scanPct: number;
-  lowOnScans: boolean;
-  plan: string;
-}) {
-  return (
-    <>
-      <div className="flex items-center gap-2 mb-8 px-2">
-        <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-7 h-7" />
-        <Link href="/dashboard" className="font-semibold hover:text-white/80 transition-colors">VibeTrace</Link>
-      </div>
-      <nav className="flex flex-col gap-1 text-sm">
-        {[
-          { label: "Dashboard", href: "/dashboard", active: true },
-          { label: "New Scan", href: "/scan", active: false },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`px-3 py-2 rounded-md transition-colors ${
-              item.active
-                ? "bg-[#3B82F6]/10 text-[#3B82F6]"
-                : "text-white/50 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
-        <Link
-          href="/scans"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-        >
-          Repositories
-        </Link>
-        <Link
-          href="/scans"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-        >
-          Reports
-        </Link>
-        <Link
-          href="/account"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-        >
-          Settings
-        </Link>
-        <Link
-          href="/account"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2"
-        >
-          <User className="w-4 h-4" />
-          Account
-        </Link>
-      </nav>
-      <div className="mt-auto">
-        <Separator className="bg-white/5 mb-4" />
-        <div className="px-3 py-2 rounded-md bg-white/[0.03] text-xs text-white/40 mb-3">
-          <div className="font-medium text-white/70 mb-1">{planLabel}</div>
-          <div>{scanCount} / {scansLimit} scans used</div>
-          <Progress value={scanPct} className="mt-2 h-1" />
-          {lowOnScans && (
-            <p className="mt-1.5 text-[#F59E0B]">Running low — upgrade for unlimited scans</p>
-          )}
-          {(plan === 'free' || plan === 'starter') && (
-            <Link href="/pricing" className="mt-2 inline-block text-[#3B82F6] text-xs hover:underline">
-              Upgrade →
-            </Link>
-          )}
-        </div>
-        <button
-          onClick={handleSignOut}
-          className="w-full px-3 py-2 rounded-md text-sm text-white/40 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign out
-        </button>
-      </div>
-    </>
   );
 }
 
@@ -268,71 +222,45 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetch('/api/dashboard')
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to fetch');
-        return res.json();
-      })
-      .then((json) => {
-        setData(json);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError(true);
-        setLoading(false);
-      });
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((d) => { setData(d); setLoading(false); })
+      .catch(() => { setError(true); setLoading(false); });
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
-        <div>Loading...</div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
+      <div className="text-white/40">Loading…</div>
+    </div>
+  );
 
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
-        <div>Failed to load dashboard</div>
-      </div>
-    );
-  }
-
-  const scanPct = (data.scan_count / data.scans_limit) * 100;
-  const lowOnScans = data.scan_count > data.scans_limit * 0.6;
-  const planLabel = data.plan === 'free'
-    ? 'Free plan'
-    : data.plan.charAt(0).toUpperCase() + data.plan.slice(1) + ' plan';
-
-  const criticalFindings = data.findings.filter(f => f.severity === 'critical');
-  const dependencyFindings = data.findings.filter(f => f.category === 'dependency');
+  if (error || !data) return (
+    <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
+      <div className="text-white/40">Failed to load dashboard</div>
+    </div>
+  );
 
   const sidebarProps = {
-    planLabel,
+    activePath: '/dashboard',
+    userEmail: data.user_email,
+    plan: data.plan,
     scanCount: data.scan_count,
     scansLimit: data.scans_limit,
-    scanPct,
-    lowOnScans,
-    plan: data.plan,
   };
+
+  const criticalFindings   = data.findings.filter(f => f.severity === 'critical');
+  const dependencyFindings = data.findings.filter(f => f.category === 'dependency');
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] text-white">
-      {/* Checkout success banner */}
-      <Suspense fallback={null}>
-        <CheckoutBanner />
-      </Suspense>
-
-      {/* Sidebar + Main layout */}
+      <Suspense fallback={null}><CheckoutBanner /></Suspense>
       <div className="flex">
-        {/* Desktop Sidebar — hidden on mobile */}
+        {/* Desktop sidebar */}
         <aside className="hidden md:flex md:w-56 md:fixed md:inset-y-0 border-r border-white/5 flex-col p-4 shrink-0">
-          <SidebarNav {...sidebarProps} />
+          <AppSidebar {...sidebarProps} />
         </aside>
 
-        {/* Main content — full width on mobile, offset on desktop */}
         <div className="md:ml-56 flex-1 flex flex-col min-h-screen">
-          {/* Mobile top nav */}
+          {/* Mobile top bar */}
           <div className="flex md:hidden items-center justify-between px-4 py-3 border-b border-white/5 bg-[#0A0A0F] sticky top-0 z-40">
             <div className="flex items-center gap-2">
               <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-6 h-6" />
@@ -345,18 +273,19 @@ export default function DashboardPage() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-56 bg-[#0A0A0F] border-white/5 p-4 flex flex-col">
-                <SidebarNav {...sidebarProps} />
+                <AppSidebar {...sidebarProps} />
               </SheetContent>
             </Sheet>
           </div>
 
-          {/* Main content */}
-          <main className="flex-1 overflow-auto p-4 md:p-8">
+          <main className="flex-1 p-4 md:p-8">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h1 className="text-2xl font-bold">Security Overview</h1>
                 <p className="text-white/40 text-sm mt-1">
-                  {data?.last_scan_at ? `Last scan: ${new Date(data.last_scan_at).toLocaleDateString()}` : 'No scans yet'}
+                  {data.last_scan_at
+                    ? `Last scan: ${new Date(data.last_scan_at).toLocaleDateString('en-GB')}`
+                    : 'No scans yet'}
                 </p>
               </div>
               <Button className="bg-[#3B82F6] hover:bg-[#2563EB] text-white" asChild>
@@ -364,57 +293,62 @@ export default function DashboardPage() {
               </Button>
             </div>
 
-            {/* Stats grid */}
+            {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[
-                { label: "Critical", value: data.severity_counts.critical, color: "#EF4444", bg: "rgba(239,68,68,0.1)" },
-                { label: "High", value: data.severity_counts.high, color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
-                { label: "Medium", value: data.severity_counts.medium, color: "#3B82F6", bg: "rgba(59,130,246,0.1)" },
-                { label: "Low", value: data.severity_counts.low, color: "#10B981", bg: "rgba(16,185,129,0.1)" },
-              ].map((stat) => (
-                <Card key={stat.label} className="bg-white/[0.02] border-white/5">
+                { ...SEV.critical, value: data.severity_counts.critical },
+                { ...SEV.high,     value: data.severity_counts.high     },
+                { ...SEV.medium,   value: data.severity_counts.medium   },
+                { ...SEV.low,      value: data.severity_counts.low      },
+              ].map((s) => (
+                <Card key={s.label} className="bg-white/[0.02] border-white/5">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-white/40 uppercase tracking-wider">
-                      {stat.label}
-                    </CardTitle>
+                    <CardTitle className="text-xs font-medium text-white/40 uppercase tracking-wider">{s.label}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold" style={{ color: stat.color }}>
-                      {stat.value}
-                    </div>
+                    <div className="text-3xl font-bold" style={{ color: s.color }}>{s.value}</div>
                   </CardContent>
                 </Card>
               ))}
             </div>
 
-            {/* Issues table */}
+            {/* Tabs */}
             <Tabs defaultValue="all">
               <TabsList className="bg-white/5 border border-white/10 mb-6">
-                <TabsTrigger value="all" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">All Issues</TabsTrigger>
-                <TabsTrigger value="critical" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">Critical</TabsTrigger>
-                <TabsTrigger value="dependencies" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">Dependencies</TabsTrigger>
+                <TabsTrigger value="all" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">
+                  All Issues {data.findings.length > 0 && `(${data.findings.length})`}
+                </TabsTrigger>
+                <TabsTrigger value="critical" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">
+                  Critical {criticalFindings.length > 0 && `(${criticalFindings.length})`}
+                </TabsTrigger>
+                <TabsTrigger value="dependencies" className="data-[state=active]:bg-[#3B82F6] data-[state=active]:text-white">
+                  Dependencies
+                </TabsTrigger>
               </TabsList>
+
               <TabsContent value="all">
-                {data.findings.length === 0 ? (
-                  data.scan_count > 0 || data.last_scan_at ? (
-                    <CleanState />
-                  ) : (
-                    <EmptyState message="Run your first scan to see security findings." />
-                  )
-                ) : (
-                  <IssuesTable findings={data.findings} />
-                )}
+                {data.findings.length === 0
+                  ? (data.last_scan_at ? <EmptyClean /> : <EmptyNoScans />)
+                  : <IssuesTable findings={data.findings} />}
               </TabsContent>
               <TabsContent value="critical">
-                {criticalFindings.length === 0 ? (
-                  <div className="text-white/40 text-center py-8">No critical issues found.</div>
-                ) : (
-                  <IssuesTable findings={criticalFindings} />
-                )}
+                {criticalFindings.length === 0
+                  ? <div className="text-white/40 text-center py-8">No critical issues.</div>
+                  : <IssuesTable findings={criticalFindings} />}
               </TabsContent>
               <TabsContent value="dependencies">
                 {dependencyFindings.length === 0 ? (
-                  <div className="text-white/40 text-center py-8">No dependency issues found.</div>
+                  <Card className="bg-white/[0.02] border-white/5">
+                    <CardContent className="flex flex-col items-center justify-center py-20 gap-4">
+                      <PackageX className="w-12 h-12 text-white/20" />
+                      <div className="text-center">
+                        <h3 className="text-lg font-semibold text-white mb-1">No dependency data</h3>
+                        <p className="text-white/40 text-sm max-w-xs">
+                          Dependency (SCA) scanning analyses your package.json for known CVEs. Coming soon.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ) : (
                   <IssuesTable findings={dependencyFindings} />
                 )}

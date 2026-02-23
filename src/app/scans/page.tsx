@@ -16,11 +16,10 @@ import {
   ChevronDown,
   ChevronUp,
   Menu,
-  User,
-  LogOut,
   ShieldCheck,
   X,
 } from "lucide-react";
+import { AppSidebar } from "@/components/app-sidebar";
 
 type Scan = {
   id: string;
@@ -62,78 +61,6 @@ const severityConfig: Record<string, { color: string; bg: string; label: string 
   low: { color: "#10B981", bg: "rgba(16,185,129,0.1)", label: "Low" },
 };
 
-function handleSignOut() {
-  fetch("/api/auth/logout", { method: "POST" }).then(() => {
-    window.location.href = "/";
-  });
-}
-
-function SidebarNav() {
-  return (
-    <>
-      <div className="flex items-center gap-2 mb-8 px-2">
-        <img src="/branding/logo-icon-dark.svg" alt="VibeTrace" className="w-7 h-7" />
-        <Link href="/dashboard" className="font-semibold hover:text-white/80 transition-colors">
-          VibeTrace
-        </Link>
-      </div>
-      <nav className="flex flex-col gap-1 text-sm">
-        {[
-          { label: "Dashboard", href: "/dashboard", active: false },
-          { label: "New Scan", href: "/scan", active: false },
-          { label: "Scan History", href: "/scans", active: true },
-        ].map((item) => (
-          <Link
-            key={item.label}
-            href={item.href}
-            className={`px-3 py-2 rounded-md transition-colors ${
-              item.active
-                ? "bg-[#3B82F6]/10 text-[#3B82F6]"
-                : "text-white/50 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
-        <Link
-          href="/dashboard"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-        >
-          Repositories
-        </Link>
-        <Link
-          href="/dashboard"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-        >
-          Reports
-        </Link>
-        <Link
-          href="/account"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5"
-        >
-          Settings
-        </Link>
-        <Link
-          href="/account"
-          className="px-3 py-2 rounded-md transition-colors text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2"
-        >
-          <User className="w-4 h-4" />
-          Account
-        </Link>
-      </nav>
-      <div className="mt-auto">
-        <Separator className="bg-white/5 mb-4" />
-        <button
-          onClick={handleSignOut}
-          className="w-full px-3 py-2 rounded-md text-sm text-white/40 hover:text-white hover:bg-white/5 transition-colors flex items-center gap-2"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign out
-        </button>
-      </div>
-    </>
-  );
-}
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "complete") {
@@ -270,7 +197,7 @@ function ScansPageContent({ highlightId }: { highlightId: string | null }) {
       <div className="flex">
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex md:w-56 md:fixed md:inset-y-0 border-r border-white/5 flex-col p-4 shrink-0">
-          <SidebarNav />
+          <AppSidebar activePath="/scans" />
         </aside>
 
         {/* Main content */}
@@ -288,7 +215,7 @@ function ScansPageContent({ highlightId }: { highlightId: string | null }) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-56 bg-[#0A0A0F] border-white/5 p-4 flex flex-col">
-                <SidebarNav />
+                <AppSidebar activePath="/scans" />
               </SheetContent>
             </Sheet>
           </div>
