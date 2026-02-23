@@ -149,7 +149,7 @@ Respond with a JSON array only.`;
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 90000);
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${geminiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
           {
             method: "POST", signal: ctrl.signal,
             headers: { "Content-Type": "application/json" },
