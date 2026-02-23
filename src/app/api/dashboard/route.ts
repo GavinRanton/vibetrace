@@ -140,7 +140,6 @@ export async function GET() {
       findings,
       severity_counts: severityCounts,
       last_scan_at: lastScanData?.completed_at ?? null,
-      user_email: user.email ?? null,
     });
   } catch (err) {
     console.error("Dashboard: unexpected error:", err);
