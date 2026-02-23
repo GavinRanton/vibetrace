@@ -101,7 +101,7 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
               <code class="rule-id">${f.rule_id}</code>
             </div>
             <div class="finding-location">
-              <strong>📁 ${f.file_path}</strong>
+              <strong>📁 ${f.file_path.replace(/^.*vibetrace-scan-[^\/]+\//, "")}</strong>
               ${f.line_number ? `<span class="line-num">Line ${f.line_number}</span>` : ''}
             </div>
             ${f.code_snippet ? `<pre class="code-snippet">${escapeHtml(f.code_snippet)}</pre>` : ''}
@@ -175,7 +175,6 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    page-break-after: always;
   }
   .logo { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
   .logo span.blue { color: #3B82F6; }
@@ -270,7 +269,6 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
 
   /* Page breaks */
   @media print {
-    .findings-section { page-break-before: always; }
     .finding-card { page-break-inside: avoid; }
     .severity-group { page-break-inside: avoid; }
   }
@@ -381,7 +379,7 @@ function buildReportHtml(scan: Scan, findings: Finding[]): string {
         <tr>
           <td><span style="color:${getSeverityColor(f.severity)};font-weight:600;">${f.severity.toUpperCase()}</span></td>
           <td>${f.category}</td>
-          <td style="font-family:monospace;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.file_path}</td>
+          <td style="font-family:monospace;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.file_path.replace(/^.*vibetrace-scan-[^\/]+\//, "")}</td>
           <td>${f.line_number || '—'}</td>
           <td>${f.status}</td>
         </tr>
