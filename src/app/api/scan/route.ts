@@ -373,19 +373,21 @@ async function processScan(
         const key = `${f.path}:${f.start.line}:${f.check_id}`;
         const translation = translations.get(key);
         const severity = mapSeverity(f.extra.severity);
+        // Strip /tmp/vibetrace-scan-XXXX/ prefix so users see clean relative paths
+        const cleanPath = repoPath ? f.path.replace(repoPath + "/", "") : f.path;
 
         return {
           scan_id: scanId,
           severity,
           category: categoriseFinding(f.check_id),
           rule_id: f.check_id,
-          file_path: f.path,
+          file_path: cleanPath,
           line_number: f.start.line,
           code_snippet: f.extra.lines,
           raw_output: f,
           plain_english: translation?.plain_english || f.extra.message,
           business_impact: translation?.business_impact || `${severity} severity finding`,
-          fix_prompt: translation?.fix_prompt || `Fix the issue in ${f.path} at line ${f.start.line}`,
+          fix_prompt: translation?.fix_prompt || `Fix the issue in ${cleanPath} at line ${f.start.line}`,
           verification_step: translation?.verification_step || "Re-run the scan to verify the fix",
           status: "open",
         };
