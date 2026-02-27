@@ -1,0 +1,78 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout \`main\` branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Next.js Standalone App
+        run: npm run build
+
+      - name: Prepare Standalone Directory
+        run: |
+          echo "Preparing standalone directory..."
+          mkdir -p .next/standalone/.next
+          cp -r .next/static .next/standalone/.next/static
+          cp -r public .next/standalone/public
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: \${{ secrets.VPS_SSH_PRIVATE_KEY }}
+
+      - name: Deploy to VPS
+        env:
+          REPO_NAME: \${{ github.event.repository.name }}
+          RELEASE_TS: \$(date +%Y%m%d%H%M%S)
+        run: |
+          set -e # Exit on error
+          RELEASE_DIR="/home/ralph/releases/\$REPO_NAME-\$RELEASE_TS"
+          LIVE_DIR="/home/ralph/\$REPO_NAME" # This is the symlink
+          
+          echo "Adding VPS to known hosts..."
+          ssh-keyscan -H 157.180.32.69 >> ~/.ssh/known_hosts
+          
+          echo "Creating new release directory: \$RELEASE_DIR"
+          ssh ralph@157.180.32.69 "mkdir -p \$RELEASE_DIR"
+          
+          echo "Syncing standalone build to new release directory..."
+          rsync -az --delete .next/standalone/ ralph@157.180.32.69:\$RELEASE_DIR/
+
+          echo "Updating symlink for \$REPO_NAME..."
+          ssh ralph@157.180.32.69 "ln -snf \$RELEASE_DIR \$LIVE_DIR"
+          
+          echo "Restarting service with PM2..."
+          ssh ralph@157.180.32.69 "pm2 restart \$REPO_NAME"
+
+      - name: Notify on Success
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: \${{ secrets.TELEGRAM_TO }}
+          token: \${{ secrets.TELEGRAM_TOKEN }}
+          message: "✅ Deployed \${{ github.event.repository.name }} successfully to production."
+
+      - name: Notify on Failure
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: \${{ secrets.TELEGRAM_TO }}
+          token: \${{ secrets.TELEGRAM_TOKEN }}
+          message: "❌ Failed to deploy \${{ github.event.repository.name }}. Check GitHub Actions for details."
