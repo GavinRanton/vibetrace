@@ -466,7 +466,16 @@ function FindingsPanel({
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-green-400/70 text-xs font-medium">🔧 Fix prompt — copy into Lovable or Cursor:</span>
                             <button
-                              onClick={() => navigator.clipboard?.writeText(f.fix_prompt)}
+                              onClick={() => {
+                                const raw = f.fix_prompt ?? "";
+                                // Strip the preamble — copy only the actual prompt/code
+                                const stripped = raw
+                                  .replace(/^In Lovable \(or Cursor\)[^\n]*\n?/i, "")
+                                  .replace(/^```[\w]*\n?/m, "")
+                                  .replace(/```\s*$/m, "")
+                                  .trim();
+                                navigator.clipboard?.writeText(stripped);
+                              }}
                               className="text-[10px] text-white/30 hover:text-white/60 px-2 py-0.5 rounded border border-white/10 hover:border-white/20 transition-colors"
                             >
                               Copy
