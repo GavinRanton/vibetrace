@@ -19,6 +19,8 @@ import {
   Menu,
   ShieldCheck,
   X,
+  Share2,
+  Link2Off,
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 
@@ -37,6 +39,8 @@ type Scan = {
   repo_id: string | null;
   repo_full_name: string | null;
   zap_included: boolean | null;
+  share_token: string | null;
+  is_shared: boolean | null;
 };
 
 type Finding = {
@@ -47,7 +51,7 @@ type Finding = {
   line_number: number | null;
   plain_english: string;
   actual_error: string;
-  fix_prompt: string;
+  fix_prompt: string | null;
   business_impact: string;
   verification_step: string;
   status: string;
@@ -169,6 +173,29 @@ function ScansPageContent({ highlightId }: { highlightId: string | null }) {
     fetchScans(scan.id);
   };
 
+  const handleShare = async (scan: Scan) => {
+    try {
+      const res = await fetch(`/api/scans/${scan.id}/share`, { method: "POST" });
+      if (!res.ok) throw new Error("Failed to share");
+      const data = await res.json();
+      const shareUrl = data.share_url || `${window.location.origin}/report/${data.share_token}`;
+      await navigator.clipboard.writeText(shareUrl);
+      await fetchScans(selectedScanId ?? undefined);
+    } catch {
+      window.alert("Failed to create share link");
+    }
+  };
+
+  const handleRevokeShare = async (scan: Scan) => {
+    try {
+      const res = await fetch(`/api/scans/${scan.id}/share`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to revoke");
+      await fetchScans(selectedScanId ?? undefined);
+    } catch {
+      window.alert("Failed to stop sharing");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0A0F] text-white flex items-center justify-center">
@@ -262,6 +289,7 @@ function ScansPageContent({ highlightId }: { highlightId: string | null }) {
                           <th className="text-left px-6 py-3 font-medium">Repository</th>
                           <th className="text-left px-6 py-3 font-medium">Score</th>
                           <th className="text-left px-6 py-3 font-medium">Status</th>
+                          <th className="text-left px-6 py-3 font-medium">Share</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -310,10 +338,35 @@ function ScansPageContent({ highlightId }: { highlightId: string | null }) {
                                     )}
                                   </div>
                                 </td>
+                                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                  {scan.status === "complete" ? (
+                                    scan.is_shared ? (
+                                      <Button
+                                        variant="outline"
+                                        className="border-white/15 text-white/70 hover:text-white text-xs h-8"
+                                        onClick={() => handleRevokeShare(scan)}
+                                      >
+                                        <Link2Off className="w-3.5 h-3.5 mr-1.5" />
+                                        Stop sharing
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        variant="outline"
+                                        className="border-[#3B82F6]/40 text-[#93C5FD] hover:text-white text-xs h-8"
+                                        onClick={() => handleShare(scan)}
+                                      >
+                                        <Share2 className="w-3.5 h-3.5 mr-1.5" />
+                                        Share report
+                                      </Button>
+                                    )
+                                  ) : (
+                                    <span className="text-white/20 text-xs">-</span>
+                                  )}
+                                </td>
                               </tr>
                               {isSelected && selectedScan && (
                                 <tr key={`${scan.id}-findings`}>
-                                  <td colSpan={4} className="px-6 py-4 bg-white/[0.02]">
+                                  <td colSpan={5} className="px-6 py-4 bg-white/[0.02]">
                                     <FindingsPanel
                                       findings={findings}
                                       loading={findingsLoading}

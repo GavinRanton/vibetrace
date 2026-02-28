@@ -121,6 +121,8 @@ export async function GET(request: NextRequest) {
         created_at,
         repo_id,
         zap_included,
+        share_token,
+        is_shared,
         repos ( full_name )
       `)
       .eq("user_id", userId)
@@ -155,7 +157,7 @@ export async function GET(request: NextRequest) {
       raw_output: any;
       actual_error: string;
       plain_english: string;
-      fix_prompt: string;
+      fix_prompt: string | null;
       business_impact: string | null;
       verification_step: string | null;
       status: string;

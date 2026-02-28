@@ -39,6 +39,58 @@ function isPrivateUrl(url: string): boolean {
   }
 }
 
+const MAX_SNIPPET_CHARS = 500;
+const ZAP_SUPPRESSED_RULES = new Set(["zap-10109"]);
+const CACHE_RULE_HINT = /(cache|pragma|expires|cache-control)/i;
+const HTML_COMMENT_HINT = /(html\s*comment|information leakage - comments|comments?\sin)/i;
+
+function truncateSnippet(input: string | null | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  return trimmed.length > MAX_SNIPPET_CHARS
+    ? `${trimmed.slice(0, MAX_SNIPPET_CHARS)}...`
+    : trimmed;
+}
+
+async function buildSemgrepSnippet(
+  repoPath: string,
+  filePath: string,
+  startLine: number,
+  endLine: number,
+  semgrepLines: string | null | undefined
+): Promise<string | null> {
+  const primary = truncateSnippet(semgrepLines);
+  if (primary) return primary;
+
+  if (!filePath) return null;
+
+  const start = Math.max(1, startLine - 2);
+  const end = Math.max(start, endLine + 2);
+  const absolutePath = `${repoPath}/${filePath}`;
+
+  try {
+    const fileRaw = await fs.readFile(absolutePath, "utf-8");
+    const fileLines = fileRaw.split(/\r?\n/);
+    const snippet = fileLines.slice(start - 1, end).join("\n");
+    return truncateSnippet(snippet);
+  } catch (err: any) {
+    console.warn(`[SEMGREP] Snippet fallback failed for ${filePath}: ${err.message}`);
+    return null;
+  }
+}
+
+function severityScore(severity: string): number {
+  const severityRank: Record<string, number> = {
+    critical: 4,
+    high: 3,
+    medium: 2,
+    low: 1,
+    info: 0,
+  };
+  return severityRank[severity] ?? 0;
+}
+
 async function runZapScan(url: string, scanId: string): Promise<number> {
   try {
     if (isPrivateUrl(url)) {
@@ -119,13 +171,14 @@ async function runZapScan(url: string, scanId: string): Promise<number> {
     }
 
     // Build base findings
-    const baseFIndings = alerts.map((alert: any) => ({
+    const baseFindings = alerts.map((alert: any) => ({
       severity: riskMap[String(alert.riskcode)] ?? "low",
       name: alert.name ?? "Unknown",
       desc: stripHtml(alert.desc || alert.name || ""),
       solution: stripHtml(alert.solution || ""),
       evidence: alert.evidence || null,
       pluginid: alert.pluginid,
+      rule_id: alert.pluginid ? `zap-${alert.pluginid}` : "zap-unknown",
     }));
 
     // Translate via Gemini for Lovable/Cursor format prompts
@@ -138,14 +191,24 @@ async function runZapScan(url: string, scanId: string): Promise<number> {
       const geminiKey = vaultData?.value ?? process.env.GEMINI_API_KEY;
 
       if (geminiKey) {
-        const dastPrompt = baseFIndings.map((f, i) => `Finding ${i+1}: ${f.name}\nSeverity: ${f.severity}\nWhat ZAP found: ${f.desc}\nZAP fix: ${f.solution}`).join("\n---\n");
+        const dastPrompt = baseFindings.map((f, i) => `Finding ${i + 1}: ${f.name}\nRule ID: ${f.rule_id}\nSeverity: ${f.severity}\nWhat ZAP found: ${f.desc}\nZAP fix: ${f.solution}`).join("\n---\n");
         const systemPrompt = `You are a security expert translating DAST (live site) security findings for non-technical founders using Lovable, Bolt.new, or Cursor to build their apps.
+
+IMPORTANT CONTEXT: Users are non-technical founders who built their app using Lovable, Bolt.new, or Cursor.
 
 For each finding, write:
 1. plain_english: 1-2 sentence plain explanation using an analogy. No jargon.
 2. business_impact: What could actually go wrong. Be specific to the risk level.
 3. fix_prompt: A complete prompt to paste into Lovable/Cursor. Must start with "In Lovable (or Cursor), paste this exactly:\n\"". Reference the specific header or setting to add. For web frameworks (Next.js, Express, etc), give the specific middleware/config code pattern to add. Never mention server config files.
 4. verification_step: Simple check — usually "Visit your site in a browser and check the Network tab headers" or similar.
+
+Rules for fix prompts:
+1. Never recommend nonces for CSP. Lovable apps use inline scripts that cannot be safely nonced. Recommend allowlisting specific trusted domains instead.
+2. Always use Next.js App Router syntax (app/error.tsx), never pages/_error.js.
+3. For COEP (Cross-Origin-Embedder-Policy), include a warning that require-corp can break third-party embeds and should be tested in staging first.
+4. For HTML comment findings, return severity "info" and leave fix_prompt empty.
+5. For cache-related findings, merge related cache findings into one combined fix prompt.
+6. The fix_prompt must be something a user can paste directly into Lovable or Cursor. If no concrete code/action exists, leave fix_prompt empty.
 
 Respond with a JSON array only.`;
 
@@ -158,7 +221,7 @@ Respond with a JSON array only.`;
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               system_instruction: { parts: [{ text: systemPrompt }] },
-              contents: [{ role: "user", parts: [{ text: `Translate these ${baseFIndings.length} DAST findings into non-technical Lovable/Cursor format:\n\n${dastPrompt}` }] }],
+              contents: [{ role: "user", parts: [{ text: `Translate these ${baseFindings.length} DAST findings into non-technical Lovable/Cursor format:\n\n${dastPrompt}` }] }],
               generationConfig: { maxOutputTokens: 32768, temperature: 0.1, responseMimeType: "application/json" },
             }),
           }
@@ -182,35 +245,81 @@ Respond with a JSON array only.`;
       console.error("[ZAP] Gemini translation error:", e.message);
     }
 
-    const findings = baseFIndings.map((f, i) => {
+    const translatedFindings = baseFindings.map((f, i) => {
       const t = translations.get(String(i));
+      const isHtmlCommentFinding = HTML_COMMENT_HINT.test(f.name) || HTML_COMMENT_HINT.test(f.desc);
+      const normalizedSeverity = isHtmlCommentFinding ? "info" : f.severity;
+
+      let fixPrompt = t?.fix_prompt || f.solution || `Fix the ${f.name} issue on your live site`;
+      if (isHtmlCommentFinding) {
+        fixPrompt = null;
+      } else if (typeof fixPrompt === "string" && /nonce/i.test(fixPrompt) && /content-security-policy|csp/i.test(f.name + " " + f.desc)) {
+        fixPrompt =
+          'In Lovable (or Cursor), paste this exactly:\n"I need to fix my Content-Security-Policy safely for a Lovable app. Do not use CSP nonces. Keep inline scripts working, and instead add a strict domain allowlist in my CSP headers for only trusted domains (including the exact third-party domains my app already uses). Please generate the exact Next.js header config and apply it in a secure way."';
+      }
+
       return {
         scan_id: scanId,
-        severity: f.severity,
+        severity: normalizedSeverity,
         category: "dast",
-        rule_id: f.pluginid ? `zap-${f.pluginid}` : "zap-unknown",
+        rule_id: f.rule_id,
         file_path: url,
         line_number: null,
-        code_snippet: f.evidence,
+        code_snippet: truncateSnippet(f.evidence),
         raw_output: alerts[i],
         plain_english: t?.plain_english || f.desc,
-        business_impact: t?.business_impact || `${f.severity} severity DAST finding: ${f.name}`,
-        fix_prompt: t?.fix_prompt || f.solution || `Fix the ${f.name} issue on your live site`,
+        business_impact: t?.business_impact || `${normalizedSeverity} severity DAST finding: ${f.name}`,
+        fix_prompt: fixPrompt,
         verification_step: t?.verification_step || "Re-run the DAST scan to verify the fix",
         status: "open",
       };
     });
 
-    if (findings.length > 0) {
-      const { error } = await adminClient.from("findings").insert(findings);
+    const filteredFindings = translatedFindings.filter((finding) => !ZAP_SUPPRESSED_RULES.has(finding.rule_id));
+
+    // Merge noisy cache findings into one per scan/rule family before deduping by rule.
+    const cacheBucket: typeof filteredFindings = [];
+    const nonCacheFindings = filteredFindings.filter((finding) => {
+      const isCache = CACHE_RULE_HINT.test(finding.rule_id) || CACHE_RULE_HINT.test(String(finding.raw_output?.name ?? ""));
+      if (isCache) cacheBucket.push(finding);
+      return !isCache;
+    });
+
+    if (cacheBucket.length > 0) {
+      const mostSevere = cacheBucket.reduce((best, current) =>
+        severityScore(current.severity) > severityScore(best.severity) ? current : best
+      );
+      nonCacheFindings.push({
+        ...mostSevere,
+        rule_id: "zap-cache-combined",
+        plain_english: "Your site has inconsistent or missing cache protections that can expose sensitive responses.",
+        business_impact:
+          "Attackers or shared devices may view stale authenticated data when cache headers are not configured consistently.",
+        fix_prompt:
+          'In Lovable (or Cursor), paste this exactly:\n"I need one unified cache-security fix. Please set strict headers for sensitive pages and API responses: Cache-Control: no-store, no-cache, must-revalidate, Pragma: no-cache, and Expires: 0. Keep static asset caching intact, but prevent caching for authenticated or user-specific content. Apply this in my Next.js response/header configuration and show the exact code changes."',
+      });
+    }
+
+    // Deduplicate by rule_id, keeping the highest-severity instance.
+    const dedupedMap = new Map<string, (typeof nonCacheFindings)[number]>();
+    for (const finding of nonCacheFindings) {
+      const existing = dedupedMap.get(finding.rule_id);
+      if (!existing || severityScore(finding.severity) > severityScore(existing.severity)) {
+        dedupedMap.set(finding.rule_id, finding);
+      }
+    }
+    const dedupedFindings = Array.from(dedupedMap.values());
+
+    if (dedupedFindings.length > 0) {
+      const { error } = await adminClient.from("findings").insert(dedupedFindings);
       if (error) {
         console.error("[ZAP] Failed to insert findings:", error);
         return 0;
       }
     }
 
-    console.log(`[ZAP] Saved ${findings.length} DAST findings for scan ${scanId}`);
-    return findings.length;
+    console.log(`[ZAP] Saved ${dedupedFindings.length} DAST findings for scan ${scanId}`);
+    return dedupedFindings.length;
   } catch (err: any) {
     console.error("[ZAP] runZapScan failed unexpectedly:", err.message);
     return 0;
@@ -370,35 +479,47 @@ async function processScan(
       const translations = await translateFindings(scanResult.findings);
 
       // Map and insert findings
-      const semgrepFindings = scanResult.findings.map((f) => {
+      const semgrepFindings: any[] = [];
+      for (const f of scanResult.findings) {
         const key = `${f.path}:${f.start.line}:${f.check_id}`;
         const translation = translations.get(key);
         const severity = mapSeverity(f.extra.severity);
         // Strip /tmp/vibetrace-scan-XXXX/ prefix so users see clean relative paths
         const cleanPath = repoPath ? f.path.replace(repoPath + "/", "") : f.path;
+        console.log("[SEMGREP] extra.lines before insert:", f.extra.lines);
+        const snippet = repoPath
+          ? await buildSemgrepSnippet(repoPath, cleanPath, f.start.line, f.end.line, f.extra.lines)
+          : truncateSnippet(f.extra.lines);
 
-        return {
+        semgrepFindings.push({
           scan_id: scanId,
           severity,
           category: categoriseFinding(f.check_id),
           rule_id: f.check_id,
           file_path: cleanPath,
           line_number: f.start.line,
-          code_snippet: f.extra.lines,
+          code_snippet: snippet ?? (cleanPath ? "Code context unavailable" : null),
           raw_output: f,
           plain_english: translation?.plain_english || f.extra.message,
           business_impact: translation?.business_impact || `${severity} severity finding`,
           fix_prompt: translation?.fix_prompt || `Fix the issue in ${cleanPath} at line ${f.start.line}`,
           verification_step: translation?.verification_step || "Re-run the scan to verify the fix",
           status: "open",
-        };
-      });
-
-      if (semgrepFindings.length > 0) {
-        await adminClient.from("findings").insert(semgrepFindings);
+        });
       }
 
-      mappedFindings.push(...semgrepFindings);
+      const dedupedSast = new Map<string, (typeof semgrepFindings)[number]>();
+      for (const finding of semgrepFindings) {
+        const dedupeKey = `${finding.rule_id}::${finding.file_path}`;
+        if (!dedupedSast.has(dedupeKey)) dedupedSast.set(dedupeKey, finding);
+      }
+      const finalSastFindings = Array.from(dedupedSast.values());
+
+      if (finalSastFindings.length > 0) {
+        await adminClient.from("findings").insert(finalSastFindings);
+      }
+
+      mappedFindings.push(...finalSastFindings);
     } else {
       // URL-only scan — go straight to DAST
       await adminClient.from("scans").update({ status: "scanning" }).eq("id", scanId);
@@ -443,7 +564,7 @@ async function processScan(
     // Fetch ALL findings for this scan (SAST + DAST + SEO) for accurate score
     const { data: allFindings } = await adminClient
       .from("findings")
-      .select("severity")
+      .select("severity, category")
       .eq("scan_id", scanId);
     const allF = allFindings ?? mappedFindings;
 

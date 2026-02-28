@@ -56,6 +56,8 @@ CREATE TABLE public.scans (
     low_count INTEGER DEFAULT 0,
     semgrep_version TEXT,
     zap_included BOOLEAN DEFAULT false,
+    share_token TEXT UNIQUE,
+    is_shared BOOLEAN NOT NULL DEFAULT false,
     duration_seconds INTEGER,
     error_message TEXT,
     started_at TIMESTAMPTZ,
@@ -202,6 +204,7 @@ CREATE INDEX idx_repos_user_id ON public.repos(user_id);
 CREATE INDEX idx_scans_repo_id ON public.scans(repo_id);
 CREATE INDEX idx_scans_user_id ON public.scans(user_id);
 CREATE INDEX idx_scans_status ON public.scans(status);
+CREATE INDEX idx_scans_share_token ON public.scans(share_token);
 CREATE INDEX idx_findings_scan_id ON public.findings(scan_id);
 CREATE INDEX idx_findings_severity ON public.findings(severity);
 CREATE INDEX idx_findings_status ON public.findings(status);
