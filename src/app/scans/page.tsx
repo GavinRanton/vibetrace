@@ -48,6 +48,8 @@ type Finding = {
   plain_english: string;
   actual_error: string;
   fix_prompt: string;
+  business_impact: string;
+  verification_step: string;
   status: string;
   created_at: string;
 };
@@ -452,14 +454,36 @@ function FindingsPanel({
                   {cfg.label}
                 </Badge>
                 <div className="min-w-0 flex-1">
-                  <p className="text-white/80 text-sm">{f.plain_english}</p>
-                  {f.category !== "seo" && (
+                  <p className="text-white/80 text-sm font-medium">{f.plain_english}</p>
+
+                  {f.category === "seo" ? (
+                    <div className="mt-2 space-y-2">
+                      {f.business_impact && (
+                        <p className="text-amber-400/70 text-xs">⚠️ {f.business_impact}</p>
+                      )}
+                      {f.fix_prompt && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-green-400/70 text-xs font-medium">🔧 Fix prompt — copy into Lovable or Cursor:</span>
+                            <button
+                              onClick={() => navigator.clipboard?.writeText(f.fix_prompt)}
+                              className="text-[10px] text-white/30 hover:text-white/60 px-2 py-0.5 rounded border border-white/10 hover:border-white/20 transition-colors"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          <pre className="bg-green-900/20 border border-green-500/20 rounded p-2 text-[11px] text-green-300/80 font-mono whitespace-pre-wrap break-words leading-relaxed max-h-32 overflow-y-auto">{f.fix_prompt}</pre>
+                        </div>
+                      )}
+                      {f.verification_step && (
+                        <p className="text-white/30 text-xs">✓ {f.verification_step}</p>
+                      )}
+                    </div>
+                  ) : (
                     <pre className="mt-2 bg-black/30 border border-white/10 rounded p-2 text-[11px] text-white/60 font-mono whitespace-pre-wrap break-words leading-relaxed max-h-20 overflow-hidden">{f.actual_error}</pre>
                   )}
-                  {f.category === "seo" && f.fix_prompt && (
-                    <p className="mt-1 text-white/40 text-xs italic line-clamp-2">{f.fix_prompt.substring(0, 120)}...</p>
-                  )}
-                  <p className="text-white/30 text-xs font-mono mt-1 truncate">
+
+                  <p className="text-white/20 text-xs font-mono mt-1 truncate">
                     {f.file_path}
                     {f.line_number ? `:${f.line_number}` : ""}
                   </p>

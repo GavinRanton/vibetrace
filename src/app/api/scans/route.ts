@@ -156,6 +156,7 @@ export async function GET(request: NextRequest) {
       actual_error: string;
       plain_english: string;
       fix_prompt: string;
+      business_impact: string | null;
       verification_step: string | null;
       status: string;
       created_at: string;
@@ -168,7 +169,7 @@ export async function GET(request: NextRequest) {
         const { data: findingsData, error: findingsError } = await db
           .from("findings")
           .select(
-            "id, severity, category, rule_id, file_path, line_number, code_snippet, raw_output, plain_english, fix_prompt, verification_step, status, created_at"
+            "id, severity, category, rule_id, file_path, line_number, code_snippet, raw_output, plain_english, business_impact, fix_prompt, verification_step, status, created_at"
           )
           .eq("scan_id", scanId)
           .order("severity", { ascending: true });
