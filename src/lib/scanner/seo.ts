@@ -32,7 +32,7 @@ async function fetchPage(url: string): Promise<PageData> {
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "VibeTrace-SEO-Scanner/1.0 (+https://vibetrace.io)",
+        "User-Agent": "VibeTrace-SEO-Scanner/1.0 (+https://vibetrace.app)",
         "Accept": "text/html",
       },
       redirect: "follow",

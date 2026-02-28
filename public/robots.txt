@@ -9,4 +9,4 @@ Disallow: /account
 Disallow: /admin
 Disallow: /api/
 
-Sitemap: https://vibetrace.io/sitemap.xml
+Sitemap: https://vibetrace.app/sitemap.xml

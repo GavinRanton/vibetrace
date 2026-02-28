@@ -1,5 +1,5 @@
 # VibeTrace — Website Security & SEO Scanner
-# https://vibetrace.io
+# https://vibetrace.app
 
 VibeTrace scans websites for security vulnerabilities and SEO issues, then generates plain-English fix prompts that non-technical founders can paste directly into Lovable, Bolt.new, or Cursor.
 

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://vibetrace.io"),
+  metadataBase: new URL("https://vibetrace.app"),
   title: {
     default: "VibeTrace — Free Website Security & SEO Scanner",
     template: "%s | VibeTrace",
@@ -26,12 +26,12 @@ export const metadata: Metadata = {
   keywords: ["website security scanner", "free security scan", "SEO audit", "vulnerability scanner", "OWASP scan", "Lovable security", "Cursor security", "website security check"],
   authors: [{ name: "VibeTrace" }],
   alternates: {
-    canonical: "https://vibetrace.io",
+    canonical: "https://vibetrace.app",
   },
   openGraph: {
     type: "website",
     locale: "en_GB",
-    url: "https://vibetrace.io",
+    url: "https://vibetrace.app",
     siteName: "VibeTrace",
     title: "VibeTrace — Free Website Security & SEO Scanner",
     description:

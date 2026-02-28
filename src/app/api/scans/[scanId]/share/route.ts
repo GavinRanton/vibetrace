@@ -14,7 +14,7 @@ const adminClient = createClient(
 function buildShareUrl(request: NextRequest, token: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (appUrl) return `${appUrl.replace(/\/$/, "")}/report/${token}`;
-  const origin = request.nextUrl.origin || "https://vibetrace.io";
+  const origin = request.nextUrl.origin || "https://vibetrace.app";
   return `${origin}/report/${token}`;
 }
 
