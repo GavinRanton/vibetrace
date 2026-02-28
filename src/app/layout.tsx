@@ -16,27 +16,33 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://vibetrace.io"),
   title: {
-    default: "VibeTrace — Security Scanning for Modern Apps",
+    default: "VibeTrace — Free Website Security & SEO Scanner",
     template: "%s | VibeTrace",
   },
   description:
-    "Enterprise-grade vulnerability scanning powered by AI. Find and fix security issues before they reach production.",
-  keywords: ["security", "vulnerability", "scanning", "SAST", "SCA", "DevSecOps"],
+    "Scan your website for security vulnerabilities and SEO issues in minutes. Get plain-English fixes you can paste straight into Lovable or Cursor. Free to start.",
+  keywords: ["website security scanner", "free security scan", "SEO audit", "vulnerability scanner", "OWASP scan", "Lovable security", "Cursor security", "website security check"],
   authors: [{ name: "VibeTrace" }],
+  alternates: {
+    canonical: "https://vibetrace.io",
+  },
   openGraph: {
     type: "website",
-    locale: "en_US",
-    url: "https://vibetrace.dev",
+    locale: "en_GB",
+    url: "https://vibetrace.io",
     siteName: "VibeTrace",
-    title: "VibeTrace — Security Scanning for Modern Apps",
+    title: "VibeTrace — Free Website Security & SEO Scanner",
     description:
-      "Enterprise-grade vulnerability scanning powered by AI.",
+      "Scan your website for security vulnerabilities and SEO issues. Get plain-English fixes for Lovable, Cursor, and more. Free to start.",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "VibeTrace Security Scanner" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "VibeTrace — Security Scanning for Modern Apps",
-    description: "Enterprise-grade vulnerability scanning powered by AI.",
+    title: "VibeTrace — Free Website Security & SEO Scanner",
+    description: "Security + SEO scan in one click. Plain-English fixes for Lovable and Cursor builders.",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,

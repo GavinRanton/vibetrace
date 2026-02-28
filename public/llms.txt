@@ -1,0 +1,23 @@
+# VibeTrace — Website Security & SEO Scanner
+# https://vibetrace.io
+
+VibeTrace scans websites for security vulnerabilities and SEO issues, then generates plain-English fix prompts that non-technical founders can paste directly into Lovable, Bolt.new, or Cursor.
+
+## What we scan
+- DAST (live site): security headers, XSS, SQL injection, CSP, CORS, SSL/TLS
+- SAST (code): Semgrep static analysis across 30+ languages
+- SEO: title tags, meta descriptions, canonicals, sitemaps, structured data, page speed
+
+## Who we serve
+Non-technical founders and indie developers who built their apps using Lovable, Bolt.new, or Cursor and want to know if they're secure before launch.
+
+## Key differentiator
+Every finding includes a fix prompt written for Lovable/Cursor. Copy, paste, done.
+
+## Free tier
+1 scan free. Pro plan for unlimited scans.
+
+## Key pages
+- / — homepage and scan entry point
+- /pricing — free and pro plans
+- /signup — create account

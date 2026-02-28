@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /scan
+Disallow: /scans
+Disallow: /repositories
+Disallow: /reports
+Disallow: /account
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://vibetrace.io/sitemap.xml
