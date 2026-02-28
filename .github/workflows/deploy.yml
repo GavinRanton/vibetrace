@@ -10,7 +10,7 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout \`main\` branch
+      - name: Checkout main branch
         uses: actions/checkout@v4
 
       - name: Set up Node.js
@@ -27,52 +27,54 @@ jobs:
 
       - name: Prepare Standalone Directory
         run: |
-          echo "Preparing standalone directory..."
           mkdir -p .next/standalone/.next
           cp -r .next/static .next/standalone/.next/static
-          cp -r public .next/standalone/public
+          [ -d public ] && cp -r public .next/standalone/public || true
 
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: \${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
 
       - name: Deploy to VPS
         env:
-          REPO_NAME: \${{ github.event.repository.name }}
-          RELEASE_TS: \$(date +%Y%m%d%H%M%S)
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
-          set -e # Exit on error
-          RELEASE_DIR="/home/ralph/releases/\$REPO_NAME-\$RELEASE_TS"
-          LIVE_DIR="/home/ralph/\$REPO_NAME" # This is the symlink
-          
+          set -e
+          RELEASE_TS=$(date +%Y%m%d%H%M%S)
+          RELEASE_DIR="/home/ralph/releases/${REPO_NAME}-${RELEASE_TS}"
+          LIVE_DIR="/home/ralph/${REPO_NAME}"
+
           echo "Adding VPS to known hosts..."
           ssh-keyscan -H 157.180.32.69 >> ~/.ssh/known_hosts
-          
-          echo "Creating new release directory: \$RELEASE_DIR"
-          ssh ralph@157.180.32.69 "mkdir -p \$RELEASE_DIR"
-          
-          echo "Syncing standalone build to new release directory..."
-          rsync -az --delete .next/standalone/ ralph@157.180.32.69:\$RELEASE_DIR/
 
-          echo "Updating symlink for \$REPO_NAME..."
-          ssh ralph@157.180.32.69 "ln -snf \$RELEASE_DIR \$LIVE_DIR"
-          
-          echo "Restarting service with PM2..."
-          ssh ralph@157.180.32.69 "pm2 restart \$REPO_NAME"
+          echo "Creating release directory: $RELEASE_DIR"
+          ssh ralph@157.180.32.69 "mkdir -p $RELEASE_DIR"
+
+          echo "Syncing build (excluding start.sh and .env)..."
+          rsync -az --delete \
+            --exclude='start.sh' \
+            --exclude='.env' \
+            .next/standalone/ ralph@157.180.32.69:$RELEASE_DIR/
+
+          echo "Updating symlink..."
+          ssh ralph@157.180.32.69 "ln -snf $RELEASE_DIR $LIVE_DIR"
+
+          echo "Restarting PM2..."
+          ssh ralph@157.180.32.69 "pm2 restart $REPO_NAME"
 
       - name: Notify on Success
         if: success()
         uses: appleboy/telegram-action@master
         with:
-          to: \${{ secrets.TELEGRAM_TO }}
-          token: \${{ secrets.TELEGRAM_TOKEN }}
-          message: "✅ Deployed \${{ github.event.repository.name }} successfully to production."
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: "✅ Deployed ${{ github.event.repository.name }} to production successfully."
 
       - name: Notify on Failure
         if: failure()
         uses: appleboy/telegram-action@master
         with:
-          to: \${{ secrets.TELEGRAM_TO }}
-          token: \${{ secrets.TELEGRAM_TOKEN }}
-          message: "❌ Failed to deploy \${{ github.event.repository.name }}. Check GitHub Actions for details."
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: "❌ Deploy failed for ${{ github.event.repository.name }}. Check GitHub Actions."
