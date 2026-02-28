@@ -43,6 +43,9 @@ const MAX_SNIPPET_CHARS = 500;
 const ZAP_SUPPRESSED_RULES = new Set(["zap-10109"]);
 const CACHE_RULE_HINT = /(cache|pragma|expires|cache-control)/i;
 const HTML_COMMENT_HINT = /(html\s*comment|information leakage - comments|comments?\sin)/i;
+const CSP_HINT = /(content-security-policy|\bcsp\b)/i;
+const COEP_HINT = /(cross-origin-embedder-policy|\bcoep\b|require-corp)/i;
+const ERROR_PAGE_HINT = /(error\s*page|stack\s*trace|exception\s*handling)/i;
 
 function truncateSnippet(input: string | null | undefined): string | null {
   if (!input) return null;
@@ -89,6 +92,37 @@ function severityScore(severity: string): number {
     info: 0,
   };
   return severityRank[severity] ?? 0;
+}
+
+function enforceLovablePromptRules(
+  finding: { name: string; desc: string; severity: string },
+  fixPrompt: string | null | undefined,
+  isHtmlCommentFinding: boolean
+): { severity: string; fixPrompt: string | null } {
+  if (isHtmlCommentFinding) {
+    return { severity: "info", fixPrompt: null };
+  }
+
+  if (!fixPrompt) {
+    return { severity: finding.severity, fixPrompt: null };
+  }
+
+  let normalized = fixPrompt;
+
+  if (CSP_HINT.test(`${finding.name} ${finding.desc}`) && /nonce/i.test(normalized)) {
+    normalized =
+      'In Lovable (or Cursor), paste this exactly:\n"I need to fix my Content-Security-Policy safely for a Lovable app. Do not use CSP nonces. Keep inline scripts working, and instead add a strict domain allowlist in my CSP headers for only trusted domains (including the exact third-party domains my app already uses). Please generate the exact Next.js header config and apply it in a secure way."';
+  }
+
+  if (COEP_HINT.test(`${finding.name} ${finding.desc}`) && !/test in staging/i.test(normalized)) {
+    normalized = `${normalized}\n\nNote: this may break third-party embeds. Test in staging first.`;
+  }
+
+  if (ERROR_PAGE_HINT.test(`${finding.name} ${finding.desc}`)) {
+    normalized = normalized.replace(/pages\/_error\.(js|tsx?)/gi, "app/error.tsx");
+  }
+
+  return { severity: finding.severity, fixPrompt: normalized };
 }
 
 async function runZapScan(url: string, scanId: string): Promise<number> {
@@ -248,15 +282,12 @@ Respond with a JSON array only.`;
     const translatedFindings = baseFindings.map((f, i) => {
       const t = translations.get(String(i));
       const isHtmlCommentFinding = HTML_COMMENT_HINT.test(f.name) || HTML_COMMENT_HINT.test(f.desc);
-      const normalizedSeverity = isHtmlCommentFinding ? "info" : f.severity;
-
-      let fixPrompt = t?.fix_prompt || f.solution || `Fix the ${f.name} issue on your live site`;
-      if (isHtmlCommentFinding) {
-        fixPrompt = null;
-      } else if (typeof fixPrompt === "string" && /nonce/i.test(fixPrompt) && /content-security-policy|csp/i.test(f.name + " " + f.desc)) {
-        fixPrompt =
-          'In Lovable (or Cursor), paste this exactly:\n"I need to fix my Content-Security-Policy safely for a Lovable app. Do not use CSP nonces. Keep inline scripts working, and instead add a strict domain allowlist in my CSP headers for only trusted domains (including the exact third-party domains my app already uses). Please generate the exact Next.js header config and apply it in a secure way."';
-      }
+      const baseFixPrompt = t?.fix_prompt || f.solution || `Fix the ${f.name} issue on your live site`;
+      const { severity: normalizedSeverity, fixPrompt } = enforceLovablePromptRules(
+        f,
+        baseFixPrompt,
+        isHtmlCommentFinding
+      );
 
       return {
         scan_id: scanId,
