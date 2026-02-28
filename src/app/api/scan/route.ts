@@ -7,6 +7,7 @@ import { exec as execCb } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs/promises";
 import { cloneRepo, runSemgrepScan, cleanupRepo, mapSeverity, categoriseFinding } from "@/lib/scanner/semgrep";
+import { runSeoScan } from "@/lib/scanner/seo";
 import { translateFindings, calculateScore } from "@/lib/scanner/translate";
 import { sendScanCompleteEmail } from "@/lib/email";
 
@@ -409,7 +410,37 @@ async function processScan(
       await runZapScan(deployedUrl, scanId);
     }
 
-    // Fetch ALL findings for this scan (SAST + DAST) for accurate score
+    // Run SEO scan if a deployed URL was provided
+    if (deployedUrl) {
+      try {
+        console.log("[SEO] Starting SEO scan for:", deployedUrl);
+        const seoFindings = await runSeoScan(deployedUrl, scanId);
+        if (seoFindings.length > 0) {
+          const seoRows = seoFindings.map(f => ({
+            scan_id: scanId,
+            severity: f.severity,
+            category: "seo",
+            rule_id: f.rule_id,
+            file_path: f.file_path,
+            line_number: null,
+            code_snippet: null,
+            raw_output: null,
+            plain_english: f.plain_english,
+            business_impact: f.business_impact,
+            fix_prompt: f.fix_prompt,
+            verification_step: f.verification_step,
+            status: "open",
+          }));
+          const { error: seoErr } = await adminClient.from("findings").insert(seoRows);
+          if (seoErr) console.error("[SEO] Failed to insert SEO findings:", seoErr);
+          else console.log(`[SEO] Saved ${seoRows.length} SEO findings for scan ${scanId}`);
+        }
+      } catch (seoErr: any) {
+        console.error("[SEO] SEO scan failed:", seoErr.message);
+      }
+    }
+
+    // Fetch ALL findings for this scan (SAST + DAST + SEO) for accurate score
     const { data: allFindings } = await adminClient
       .from("findings")
       .select("severity")

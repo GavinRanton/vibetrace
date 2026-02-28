@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
@@ -379,9 +380,16 @@ function FindingsPanel({
     );
   }
 
+  const [activeTab, setActiveTab] = React.useState<"security" | "seo">("security");
+
+  const securityFindings = findings.filter(f => f.category !== "seo");
+  const seoFindings = findings.filter(f => f.category === "seo");
+  const hasSeo = seoFindings.length > 0;
+  const visibleFindings = activeTab === "seo" ? seoFindings : securityFindings;
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-4">
           <span className="text-white/60 text-sm">{findings.length} finding{findings.length !== 1 ? "s" : ""}</span>
           {scan.critical_count ? (
@@ -399,8 +407,33 @@ function FindingsPanel({
           <X className="w-4 h-4" />
         </Button>
       </div>
+
+      {hasSeo && (
+        <div className="flex gap-1 mb-3 border-b border-white/10 pb-2">
+          <button
+            onClick={() => setActiveTab("security")}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${activeTab === "security" ? "bg-[#3B82F6]/20 text-[#3B82F6]" : "text-white/40 hover:text-white/60"}`}
+          >
+            🔒 Security ({securityFindings.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("seo")}
+            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${activeTab === "seo" ? "bg-green-500/20 text-green-400" : "text-white/40 hover:text-white/60"}`}
+          >
+            🔍 SEO ({seoFindings.length})
+          </button>
+        </div>
+      )}
+
       <div className="space-y-2 max-h-80 overflow-y-auto">
-        {findings.map((f) => {
+        {visibleFindings.length === 0 ? (
+          <div className="flex items-center gap-3 py-4">
+            <ShieldCheck className="w-6 h-6 text-green-400" />
+            <p className="text-white/60 text-sm">
+              {activeTab === "seo" ? "No SEO issues detected." : "No security issues detected."}
+            </p>
+          </div>
+        ) : visibleFindings.map((f) => {
           const cfg = severityConfig[f.severity] ?? severityConfig.low;
           return (
             <div
@@ -420,7 +453,12 @@ function FindingsPanel({
                 </Badge>
                 <div className="min-w-0 flex-1">
                   <p className="text-white/80 text-sm">{f.plain_english}</p>
-                  <pre className="mt-2 bg-black/30 border border-white/10 rounded p-2 text-[11px] text-white/60 font-mono whitespace-pre-wrap break-words leading-relaxed max-h-20 overflow-hidden">{f.actual_error}</pre>
+                  {f.category !== "seo" && (
+                    <pre className="mt-2 bg-black/30 border border-white/10 rounded p-2 text-[11px] text-white/60 font-mono whitespace-pre-wrap break-words leading-relaxed max-h-20 overflow-hidden">{f.actual_error}</pre>
+                  )}
+                  {f.category === "seo" && f.fix_prompt && (
+                    <p className="mt-1 text-white/40 text-xs italic line-clamp-2">{f.fix_prompt.substring(0, 120)}...</p>
+                  )}
                   <p className="text-white/30 text-xs font-mono mt-1 truncate">
                     {f.file_path}
                     {f.line_number ? `:${f.line_number}` : ""}
