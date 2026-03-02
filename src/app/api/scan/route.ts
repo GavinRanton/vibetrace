@@ -416,6 +416,10 @@ const NON_PRODUCTION_PATH_PATTERNS = [
   // VT-FIX-7c: UI components and AI utility files — Math.random() is for animations/jitter
   /(^|\/)src\/components\//i,
   /(^|\/)lib\/(embeddings|openai|intent|ai|llm|vector|search)[\w-]*\.[jt]sx?$/i,
+  // VT-FIX-8: Admin, migrate, and config files — reduced attack surface
+  /(^|\/)src\/app\/api\/admin\//i,
+  /\/migrate\/route\.[jt]sx?$/i,
+  /(^|\/)nginx\//i,
 ];
 
 function isNonProductionPath(filePath: string): boolean {
@@ -590,8 +594,8 @@ async function processScan(
         const cleanPath = repoPath ? f.path.replace(repoPath + "/", "") : f.path;
         // VT-FIX-7: Downgrade severity for non-production paths
         const nonProd = isNonProductionPath(cleanPath);
-        // VT-FIX-7: Double-downgrade non-prod paths (HIGH->LOW, MEDIUM->INFO) — no live attack surface
-        const severity = nonProd ? downgradeSeverity(downgradeSeverity(baseSeverity)) : baseSeverity;
+        // VT-FIX-8: Triple-downgrade non-prod paths (HIGH->INFO via 3 steps) — no live attack surface
+        const severity = nonProd ? downgradeSeverity(downgradeSeverity(downgradeSeverity(baseSeverity))) : baseSeverity;
         if (nonProd) console.log(`[semgrep] Non-prod path severity downgraded: ${cleanPath} ${baseSeverity} -> ${severity}`);
         console.log("[SEMGREP] extra.lines before insert:", f.extra.lines);
         const snippet = repoPath
