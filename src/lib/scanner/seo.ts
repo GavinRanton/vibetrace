@@ -58,10 +58,9 @@ function extract(html: string, pattern: RegExp): string | null {
 
 // NOTE: pattern is always a trusted internal RegExp literal — not user input
 function extractAll(html: string, pattern: RegExp): string[] {
-  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
   const globalPattern = pattern.flags.includes('g')
     ? pattern
-    : new RegExp(pattern.source, pattern.flags + 'g');
+    : new RegExp(pattern.source, pattern.flags + 'g'); // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
   return [...html.matchAll(globalPattern)].map(m => (m[1] || m[0]).trim());
 }
 
