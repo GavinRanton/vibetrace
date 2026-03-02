@@ -69,6 +69,8 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [filter, setFilter] = useState('')
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [savedUrlsAll, setSavedUrlsAll] = useState<{ id: string; url: string; label?: string; scan_count: number; last_scanned_at: string; user_id: string }[]>([])
+  const [loadingUrls, setLoadingUrls] = useState(false)
 
   useEffect(() => {
     fetch('/api/admin/user?email=' + encodeURIComponent(ADMIN_EMAIL))
@@ -85,6 +87,13 @@ export default function AdminPage() {
       .then((r) => r.json())
       .then((d) => { setUsers(d.users ?? []); setLoadingUsers(false) })
       .catch(() => setLoadingUsers(false))
+  }
+
+  async function loadSavedUrls() {
+    setLoadingUrls(true)
+    const res = await fetch('/api/admin/saved-urls')
+    if (res.ok) setSavedUrlsAll(await res.json())
+    setLoadingUrls(false)
   }
 
   function handlePlanChange(user: User, newPlan: string) {
@@ -192,6 +201,37 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Saved URLs Section */}
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-white/70 font-medium text-sm uppercase tracking-wider">Saved URLs</h2>
+                <Button size="sm" variant="ghost" className="text-white/40 text-xs" onClick={loadSavedUrls}>
+                  {loadingUrls ? "Loading…" : "Load"}
+                </Button>
+              </div>
+              {savedUrlsAll.length > 0 && (
+                <div className="space-y-2">
+                  {savedUrlsAll.map(s => (
+                    <div key={s.id} className="flex items-center justify-between bg-white/[0.02] border border-white/5 rounded-lg px-4 py-2">
+                      <div>
+                        <p className="text-white/70 text-sm font-mono">{s.url}</p>
+                        <p className="text-white/30 text-xs">{s.scan_count} scans · last {new Date(s.last_scanned_at).toLocaleDateString()}</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          await fetch('/api/admin/saved-urls', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) })
+                          setSavedUrlsAll(prev => prev.filter(u => u.id !== s.id))
+                        }}
+                        className="text-white/20 hover:text-red-400 text-xs ml-4"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </main>
         </div>
       </div>

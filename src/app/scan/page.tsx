@@ -31,6 +31,9 @@ export default function ScanPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [deployedUrl, setDeployedUrl] = useState("");
   const [urlError, setUrlError] = useState("");
+  const [savedUrls, setSavedUrls] = useState<{ id: string; url: string; label?: string; scan_count: number }[]>([]);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
+  const [lastScannedUrl, setLastScannedUrl] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,6 +57,14 @@ export default function ScanPage() {
     }
 
     init();
+  }, []);
+
+  // Load saved URLs on mount
+  useEffect(() => {
+    fetch("/api/saved-urls")
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setSavedUrls(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, []);
 
   const handleSignInWithGitHub = async () => {
@@ -94,6 +105,12 @@ export default function ScanPage() {
 
       if (res.ok) {
         const { scan_id } = await res.json();
+        // Check if URL should be saved
+        const isAlreadySaved = savedUrls.some(s => s.url === deployedUrl.toLowerCase());
+        if (deployedUrl && !isAlreadySaved) {
+          setLastScannedUrl(deployedUrl.toLowerCase());
+          setShowSavePrompt(true);
+        }
         router.push(`/scans?id=${scan_id}`);
         return;
       }
@@ -257,7 +274,7 @@ export default function ScanPage() {
                 )}
 
                 {/* Deployed URL input */}
-                <div className="mt-4 space-y-1">
+                <div className="mt-4 space-y-2">
                   <label className="text-sm text-white/60 font-medium">
                     Deployed URL{" "}
                     <span className="text-white/30 font-normal">
@@ -265,14 +282,45 @@ export default function ScanPage() {
                     </span>
                   </label>
                   <p className="text-xs text-white/30">We&apos;ll scan your live site for runtime vulnerabilities</p>
+
+                  {/* Saved URL quick-select */}
+                  {savedUrls.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-white/40">Your saved URLs:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {savedUrls.map(saved => (
+                          <button
+                            key={saved.id}
+                            onClick={() => {
+                              setDeployedUrl(saved.url);
+                              setUrlError("");
+                            }}
+                            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                              deployedUrl === saved.url
+                                ? "bg-[#3B82F6]/20 border-[#3B82F6]/60 text-[#60A5FA]"
+                                : "bg-white/5 border-white/10 text-white/50 hover:border-white/30 hover:text-white/80"
+                            }`}
+                          >
+                            {saved.label || saved.url.replace(/^https?:\/\//, "")}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* URL text input */}
                   <Input
                     value={deployedUrl}
                     onChange={(e) => {
-                      setDeployedUrl(e.target.value);
+                      setDeployedUrl(e.target.value.toLowerCase());
                       setUrlError("");
                     }}
                     placeholder="https://your-app.vercel.app"
                     className="bg-white/5 border-white/10 text-white placeholder:text-white/20 font-mono"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    autoComplete="url"
+                    inputMode="url"
                   />
                   {urlError && <p className="text-xs text-red-400">{urlError}</p>}
                 </div>
@@ -344,6 +392,43 @@ export default function ScanPage() {
           )}
         </div>
       </div>
+
+      {/* Save URL prompt */}
+      {showSavePrompt && lastScannedUrl && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm px-4">
+          <div className="bg-[#1a1f2e] border border-white/10 rounded-xl p-4 shadow-2xl">
+            <p className="text-sm text-white/80 mb-1">Save this URL?</p>
+            <p className="text-xs text-white/40 font-mono mb-3 truncate">{lastScannedUrl}</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-xs"
+                onClick={async () => {
+                  await fetch("/api/saved-urls", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: lastScannedUrl }),
+                  });
+                  // Refresh saved URLs
+                  const updated = await fetch("/api/saved-urls").then(r => r.json());
+                  setSavedUrls(updated);
+                  setShowSavePrompt(false);
+                }}
+              >
+                Save for next time
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-white/40 text-xs hover:text-white/60"
+                onClick={() => setShowSavePrompt(false)}
+              >
+                Not now
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
