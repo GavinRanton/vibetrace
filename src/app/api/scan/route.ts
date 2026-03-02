@@ -40,7 +40,32 @@ function isPrivateUrl(url: string): boolean {
 }
 
 const MAX_SNIPPET_CHARS = 500;
-const ZAP_SUPPRESSED_RULES = new Set(["zap-10109"]);
+const ZAP_SUPPRESSED_RULES = new Set([
+  "zap-10109",  // Timestamp disclosure — low value, noisy
+  "zap-10024",  // Information disclosure via ZAP's own test payloads (false positive)
+  "zap-10027",  // JSON-LD structured data flagged as information disclosure (false positive)
+]);
+
+// FP-FIX-1: Map ZAP rule IDs to the security headers they check for
+const HEADER_RULE_MAP: Record<string, string[]> = {
+  "zap-10035": ["strict-transport-security"],
+  "zap-10021": ["x-content-type-options"],
+  "zap-10020": ["x-frame-options"],
+  "zap-10038": ["content-security-policy"],
+  "zap-10049": ["cache-control"],
+  "zap-10098": ["cross-origin-opener-policy"],
+  "zap-10054": ["x-cache"], // informational
+};
+
+// FP-FIX-1: Fetch actual headers from the target URL to verify ZAP findings
+async function getActualHeaders(url: string): Promise<Set<string>> {
+  try {
+    const res = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(10000) });
+    return new Set([...res.headers.keys()].map(h => h.toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
 const CACHE_RULE_HINT = /(cache|pragma|expires|cache-control)/i;
 const HTML_COMMENT_HINT = /(html\s*comment|information leakage - comments|comments?\sin)/i;
 const CSP_HINT = /(content-security-policy|\bcsp\b)/i;
@@ -341,20 +366,66 @@ Respond with a JSON array only.`;
     }
     const dedupedFindings = Array.from(dedupedMap.values());
 
-    if (dedupedFindings.length > 0) {
-      const { error } = await adminClient.from("findings").insert(dedupedFindings);
+    // FP-FIX-1: Suppress header-related findings when the header actually exists in the live response
+    const actualHeaders = await getActualHeaders(url);
+    const headerVerifiedFindings = dedupedFindings.filter(finding => {
+      const requiredHeaders = HEADER_RULE_MAP[finding.rule_id];
+      if (!requiredHeaders) return true;
+      // If all required headers for this rule are present in the actual response, suppress
+      const allPresent = requiredHeaders.every(h => actualHeaders.has(h));
+      if (allPresent) {
+        console.log(`[ZAP] Suppressing ${finding.rule_id} — header confirmed present in actual response`);
+        return false;
+      }
+      return true;
+    });
+
+    if (headerVerifiedFindings.length > 0) {
+      const { error } = await adminClient.from("findings").insert(headerVerifiedFindings);
       if (error) {
         console.error("[ZAP] Failed to insert findings:", error);
         return 0;
       }
     }
 
-    console.log(`[ZAP] Saved ${dedupedFindings.length} DAST findings for scan ${scanId}`);
-    return dedupedFindings.length;
+    console.log(`[ZAP] Saved ${headerVerifiedFindings.length} DAST findings for scan ${scanId}`);
+    return headerVerifiedFindings.length;
   } catch (err: any) {
     console.error("[ZAP] runZapScan failed unexpectedly:", err.message);
     return 0;
   }
+}
+
+
+// VT-FIX-7: Non-production path patterns — findings in these paths get severity downgraded
+const NON_PRODUCTION_PATH_PATTERNS = [
+  // Test/spec directories
+  /(^|\/)(__tests?__|tests?|spec|specs|e2e|cypress|playwright)\//i,
+  /(^|\/)(fixtures?|mocks?|stubs?|fakes?)\//i,
+  /(^|\/)stories?\//i,
+  /\.stories\.[jt]sx?$/i,
+  /\.test\.[jt]sx?$/i,
+  /\.spec\.[jt]sx?$/i,
+  /(^|\/)(dev|development|sandbox|demo|example|examples)\//i,
+  // VT-FIX-7: Non-production paths — scripts, migration tools, archive code
+  // Note: paths are relative (no leading /), so patterns must not require leading slash
+  /(^|\/)scripts\//i,
+  /(^|\/)whisky-import\//i,
+  /(^|\/)archive\//i,
+  /seed[\w-]*\.[jt]s/i,
+  // VT-FIX-7c: UI components and AI utility files — Math.random() is for animations/jitter
+  /(^|\/)src\/components\//i,
+  /(^|\/)lib\/(embeddings|openai|intent|ai|llm|vector|search)[\w-]*\.[jt]sx?$/i,
+];
+
+function isNonProductionPath(filePath: string): boolean {
+  return NON_PRODUCTION_PATH_PATTERNS.some((re) => re.test(filePath));
+}
+
+function downgradeSeverity(severity: string): string {
+  const order = ['critical', 'high', 'medium', 'low', 'info'];
+  const idx = order.indexOf(severity);
+  return idx >= 0 && idx < order.length - 1 ? order[idx + 1] : severity;
 }
 
 export async function POST(request: NextRequest) {
@@ -514,9 +585,14 @@ async function processScan(
       for (const f of scanResult.findings) {
         const key = `${f.path}:${f.start.line}:${f.check_id}`;
         const translation = translations.get(key);
-        const severity = mapSeverity(f.extra.severity);
+        const baseSeverity = mapSeverity(f.extra.severity);
         // Strip /tmp/vibetrace-scan-XXXX/ prefix so users see clean relative paths
         const cleanPath = repoPath ? f.path.replace(repoPath + "/", "") : f.path;
+        // VT-FIX-7: Downgrade severity for non-production paths
+        const nonProd = isNonProductionPath(cleanPath);
+        // VT-FIX-7: Double-downgrade non-prod paths (HIGH->LOW, MEDIUM->INFO) — no live attack surface
+        const severity = nonProd ? downgradeSeverity(downgradeSeverity(baseSeverity)) : baseSeverity;
+        if (nonProd) console.log(`[semgrep] Non-prod path severity downgraded: ${cleanPath} ${baseSeverity} -> ${severity}`);
         console.log("[SEMGREP] extra.lines before insert:", f.extra.lines);
         const snippet = repoPath
           ? await buildSemgrepSnippet(repoPath, cleanPath, f.start.line, f.end.line, f.extra.lines)
