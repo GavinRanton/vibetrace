@@ -26,8 +26,12 @@ const securityHeaders = [
     value: "same-origin",
   },
   {
+    key: "Cross-Origin-Embedder-Policy",
+    value: "credentialless",
+  },
+  {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=()",
+    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()",
   },
   {
     key: "Content-Security-Policy",
@@ -41,7 +45,25 @@ const securityHeaders = [
       "frame-src 'self' https://accounts.google.com",
       "object-src 'none'",
       "base-uri 'self'",
+      "frame-ancestors 'self'",
+      "form-action 'self'",
+      "upgrade-insecure-requests",
     ].join("; "),
+  },
+];
+
+const apiCacheHeaders = [
+  {
+    key: "Cache-Control",
+    value: "no-store, no-cache, must-revalidate",
+  },
+  {
+    key: "Pragma",
+    value: "no-cache",
+  },
+  {
+    key: "Expires",
+    value: "0",
   },
 ];
 
@@ -52,6 +74,10 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/api/:path*",
+        headers: apiCacheHeaders,
       },
     ];
   },
