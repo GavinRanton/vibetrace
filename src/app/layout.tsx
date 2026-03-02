@@ -61,6 +61,33 @@ export default function RootLayout({
       className={`${inter.variable} ${geistMono.variable} dark`}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebApplication",
+              "name": "VibeTrace",
+              "url": "https://vibetrace.app",
+              "description": "Automated security scanning for vibe-coded apps. Find vulnerabilities in your Lovable, Bolt, or Cursor project before your users do.",
+              "applicationCategory": "SecurityApplication",
+              "operatingSystem": "Web",
+              "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD",
+                "description": "Free security scan"
+              },
+              "provider": {
+                "@type": "Organization",
+                "name": "VibeTrace",
+                "url": "https://vibetrace.app"
+              }
+            })
+          }}
+        />
+      </head>
       <body className="font-sans antialiased min-h-screen bg-[#0A0A0F]">
         {children}
         <Toaster richColors position="top-right" />

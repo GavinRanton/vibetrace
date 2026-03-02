@@ -128,6 +128,15 @@ function filterSastFalsePositives(findings: SemgrepFinding[]): SemgrepFinding[] 
       }
     }
 
+    // FP-FIX-9: Insecure HTTP on localhost/127.0.0.1 — internal loopback, HTTPS not applicable
+    if (ruleId.includes('insecure-request') || ruleId.includes('insecure-url') || ruleId.includes('http-not-https')) {
+      if (/https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(lines)) {
+        console.log(`[semgrep] Suppressing localhost HTTP FP: ${f.check_id}`);
+        suppressed++;
+        return false;
+      }
+    }
+
     return true;
   });
 

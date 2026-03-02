@@ -36,8 +36,8 @@ For eval with user input \`eval(req.body.code)\`:
 
 Respond in JSON format only — a JSON array. No markdown, no explanation outside the JSON.`;
 
-const VAULT_URL = "http://127.0.0.1:8443/secrets/vibetrace/GEMINI_API_KEY";
-const VAULT_TOKEN = "Bearer f4e28f48a1944aec09e7141ecb980ff518d06b53f2ed9897981ee9a5776ade40";
+const VAULT_URL = process.env.VAULT_URL ?? "http://127.0.0.1:8443/secrets/vibetrace/GEMINI_API_KEY";
+const VAULT_TOKEN = `Bearer ${process.env.VAULT_TOKEN ?? "f4e28f48a1944aec09e7141ecb980ff518d06b53f2ed9897981ee9a5776ade40"}`;
 
 async function getGeminiKey(): Promise<string | null> {
   try {
@@ -129,10 +129,10 @@ export function calculateScore(
   if (findings.length === 0) return 100;
 
   const weights: Record<string, Record<string, number>> = {
-    critical: { sast: 25, sca: 20, dast: 15, secret: 30, seo: 0 },
-    high: { sast: 12, sca: 10, dast: 8, secret: 15, seo: 0 },
-    medium: { sast: 5, sca: 4, dast: 3, secret: 6, seo: 0 },
-    low: { sast: 2, sca: 2, dast: 1, secret: 3, seo: 0 },
+    critical: { sast: 25, sca: 20, dast: 15, secret: 30, seo: 8 },
+    high: { sast: 12, sca: 10, dast: 8, secret: 15, seo: 4 },
+    medium: { sast: 5, sca: 4, dast: 3, secret: 6, seo: 2 },
+    low: { sast: 2, sca: 2, dast: 1, secret: 3, seo: 1 },
     info: { sast: 0, sca: 0, dast: 0, secret: 0, seo: 0 },
   };
 

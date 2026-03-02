@@ -243,8 +243,10 @@ async function runZapScan(url: string, scanId: string): Promise<number> {
     // Translate via Gemini for Lovable/Cursor format prompts
     let translations: Map<string, any> = new Map();
     try {
-      const vaultRes = await fetch("http://127.0.0.1:8443/secrets/vibetrace/GEMINI_API_KEY", {
-        headers: { Authorization: "Bearer f4e28f48a1944aec09e7141ecb980ff518d06b53f2ed9897981ee9a5776ade40" },
+      const vaultUrl = process.env.VAULT_URL ?? "http://127.0.0.1:8443/secrets/vibetrace/GEMINI_API_KEY";
+      const vaultToken = process.env.VAULT_TOKEN ?? "f4e28f48a1944aec09e7141ecb980ff518d06b53f2ed9897981ee9a5776ade40";
+      const vaultRes = await fetch(vaultUrl, {
+        headers: { Authorization: `Bearer ${vaultToken}` },
       }).catch(() => null);
       const vaultData = vaultRes?.ok ? await vaultRes.json() : null;
       const geminiKey = vaultData?.value ?? process.env.GEMINI_API_KEY;

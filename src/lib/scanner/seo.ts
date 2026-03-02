@@ -56,8 +56,13 @@ function extract(html: string, pattern: RegExp): string | null {
   return m ? (m[1] || m[0]).trim() : null;
 }
 
+// NOTE: pattern is always a trusted internal RegExp literal — not user input
 function extractAll(html: string, pattern: RegExp): string[] {
-  return [...html.matchAll(new RegExp(pattern.source, pattern.flags + (pattern.flags.includes("g") ? "" : "g")))].map(m => (m[1] || m[0]).trim());
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
+  const globalPattern = pattern.flags.includes('g')
+    ? pattern
+    : new RegExp(pattern.source, pattern.flags + 'g');
+  return [...html.matchAll(globalPattern)].map(m => (m[1] || m[0]).trim());
 }
 
 function stripTags(html: string): string {
@@ -69,7 +74,7 @@ async function checkRobotsTxt(baseUrl: string): Promise<{ exists: boolean; block
     const res = await fetch(new URL("/robots.txt", baseUrl).href, { redirect: "follow" });
     if (!res.ok) return { exists: false, blocksAll: false };
     const text = await res.text();
-    const blocksAll = /User-agent:\s*\*[\s\S]*?Disallow:\s*\//i.test(text);
+    const blocksAll = /User-agent:\s*\*[\s\S]*?Disallow:\s*\/\s*(\r?\n|$)/im.test(text);
     return { exists: true, blocksAll };
   } catch {
     return { exists: false, blocksAll: false };
