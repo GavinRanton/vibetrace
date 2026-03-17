@@ -560,7 +560,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processScan(
+export async function processScan(
   scanId: string,
   repoFullName: string | null,
   githubToken: string | null,
