@@ -167,10 +167,6 @@ export async function POST(request: NextRequest) {
         started_at: new Date().toISOString(),
         share_token: shareToken,
         is_shared: true,
-        metadata: {
-          owner_email: trimmedOwnerEmail,
-          source: "outbound-scanner",
-        },
       })
       .select("id, status, share_token")
       .single();
