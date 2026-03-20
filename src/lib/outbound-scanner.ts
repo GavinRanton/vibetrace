@@ -35,6 +35,11 @@ export function isValidOutboundEmail(email: string): boolean {
   return true;
 }
 
-export function shouldSendOutbound(score: number): boolean {
-  return score < 80;
+// Story 6: Only send outbound to repos that need help (score < 80)
+export function shouldSendOutbound(score: number, repoName?: string): boolean {
+  if (score >= 80) {
+    console.log(`[outbound] Skipping repo (score ${score} >= 80, no help needed): ${repoName ?? "unknown"}`);
+    return false;
+  }
+  return true;
 }
