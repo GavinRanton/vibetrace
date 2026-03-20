@@ -34,6 +34,10 @@ const securityHeaders = [
     value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()",
   },
   {
+    key: "X-XSS-Protection",
+    value: "1; mode=block",
+  },
+  {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
