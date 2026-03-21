@@ -3,7 +3,7 @@ import { after, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { NextRequest } from "next/server";
 
-import { processScan } from "@/app/api/scan/route";
+import { processScan } from "@/lib/scanner/pipeline";
 
 const adminClient = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
