@@ -153,10 +153,11 @@ export async function runSemgrepScan(repoPath: string): Promise<ScanResult> {
   try {
     // Use --config auto for broad community coverage (catches eval, command injection, XSS, SQL)
     // Plus our custom rules for vibe-coded app patterns (hardcoded secrets, weak crypto)
-    const cmd = `/home/ralph/.local/bin/semgrep scan --config auto --config ${CUSTOM_RULES_PATH} --json --output ${outputFile} --timeout 120 ${repoPath}`;
-    
-    const semgrepPath = '/home/ralph/.local/bin';
-    const envPath = `${semgrepPath}:/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}`;
+    const semgrepBin = process.env.SEMGREP_PATH || 'semgrep';
+    const cmd = `${semgrepBin} scan --config auto --config ${CUSTOM_RULES_PATH} --json --output ${outputFile} --timeout 120 ${repoPath}`;
+
+    const semgrepDir = process.env.SEMGREP_PATH ? path.dirname(process.env.SEMGREP_PATH) : '';
+    const envPath = `${semgrepDir}${semgrepDir ? ':' : ''}/usr/local/bin:/usr/bin:/bin:${process.env.PATH || ''}`;
     await execAsync(
       cmd,
       { timeout: 180000, maxBuffer: 50 * 1024 * 1024, env: { ...process.env, PATH: envPath } }
