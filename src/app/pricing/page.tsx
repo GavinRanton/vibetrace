@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, Crown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ const PRICE_IDS = {
   proMonthly:     process.env.NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE     ?? 'price_1T2c91FL8TcuJGVGLfduO87r',
   proAnnual:      process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE      ?? 'price_1T2c92FL8TcuJGVGuMMfyzMl',
   deepAudit:      process.env.NEXT_PUBLIC_STRIPE_DEEP_AUDIT_PRICE      ?? 'price_1T2c92FL8TcuJGVGUUovUx4p',
+  founderMember:  process.env.NEXT_PUBLIC_STRIPE_FOUNDER_PRICE         ?? 'price_1TFAAPFL8TcuJGVGmKOwBpZc',
 };
 
 const features = {
@@ -276,6 +277,54 @@ export default function PricingPage() {
                 onClick={() => startCheckout(PRICE_IDS.deepAudit)}
               >
                 Get Deep Audit
+              </Button>
+            </div>
+          </Card>
+        </div>
+
+        {/* Founder Member — one-time lifetime card */}
+        <div className="mt-6">
+          <Card className="border-amber-400/30 bg-amber-400/5 flex flex-col md:flex-row items-center justify-between gap-6 p-6">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-amber-400/20 flex items-center justify-center shrink-0">
+                <Crown size={18} className="text-amber-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-white font-semibold text-lg">Founder Member</h3>
+                  <Badge className="bg-amber-400/20 text-amber-400 border-amber-400/30 text-xs">One-time · Lifetime</Badge>
+                </div>
+                <p className="text-white/50 text-sm max-w-lg">
+                  Pay once, use forever. Up to 500 scans per month, all Pro features, and a direct line to shape the product roadmap.
+                  Founder pricing is locked — it will never increase.
+                </p>
+                <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-white/40">
+                  {[
+                    "Everything in Pro — forever",
+                    "500 scans/month",
+                    "Founder Member badge",
+                    "Direct feedback channel",
+                    "Feature voting",
+                    "Founder pricing locked",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-1.5">
+                      <Check size={12} className="text-amber-400 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 shrink-0">
+              <div className="text-right">
+                <p className="text-3xl font-bold text-white">£79</p>
+                <p className="text-white/40 text-xs">one-time payment</p>
+              </div>
+              <Button
+                className="bg-amber-500 hover:bg-amber-600 text-white whitespace-nowrap"
+                onClick={() => startCheckout(PRICE_IDS.founderMember)}
+              >
+                Become a Founder
               </Button>
             </div>
           </Card>
