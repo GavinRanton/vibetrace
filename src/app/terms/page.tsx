@@ -125,7 +125,46 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-white font-semibold text-lg mb-3">9. Contact</h2>
+            <h2 className="text-white font-semibold text-lg mb-3">9. Founder Member Programme</h2>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">1. Definitions:</strong> &ldquo;Founder Member&rdquo; means users who purchase a Founder Member (Lifetime) subscription. &ldquo;Service&rdquo; means VibeTrace.
+            </p>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">2. Benefits:</strong>
+            </p>
+            <ul className="list-disc list-inside text-white/70 space-y-2">
+              <li>Access to Pro-tier features as available at purchase and subsequently developed</li>
+              <li>Founder Member badge on profile</li>
+              <li>Direct feedback channel to product development team</li>
+              <li>Feature voting rights on upcoming development</li>
+              <li>Early access to new features before general availability</li>
+              <li>Founder pricing locked — price will not increase</li>
+            </ul>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">3. Lifetime Access:</strong> &ldquo;Lifetime&rdquo; means as long as the Service operates. If the Service is permanently discontinued, you will receive 90 days written notice and either a pro-rata refund (based on a 5-year assumed lifespan) or equivalent successor service access. Founder Member status is non-transferable and cannot be resold, transferred, or shared.
+            </p>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">4. Usage Limits:</strong> Founder Member subscriptions include a 500 lifetime scan allocation. When this allocation is exhausted, you may purchase additional scan credits or upgrade to a monthly or annual plan. Unused scans do not expire.
+            </p>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">5. Payment and Refunds:</strong> Founder Member subscriptions require a single one-time payment. This payment is non-refundable after 14 days, in accordance with the Consumer Contracts Regulations 2013. Within 14 days, a full refund is available if the Service has not been used beyond initial setup. Refund requests should be sent to our support email.
+            </p>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">6. Feature Availability:</strong> Your subscription includes Pro features available at purchase plus future Pro additions. New premium tiers above Pro are not automatically included, but discounted upgrade offers will be provided. We reserve the right to modify, add, or remove features.
+            </p>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">7. Account Conduct:</strong> Founder Members are subject to the same acceptable use policies as all accounts. Abuse of feedback, voting, or early access privileges may result in removal of those benefits (though not core Pro access). Automated or programmatic abuse may result in rate limiting.
+            </p>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">8. Termination:</strong> We may terminate Founder Member access for material breach, with written notice and a 14-day cure period. Voluntary cancellation does not entitle you to a refund.
+            </p>
+            <p className="text-white/70 leading-relaxed mb-3">
+              <strong className="text-white">9. Governing Law:</strong> This programme is governed by the laws of England and Wales.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-white font-semibold text-lg mb-3">10. Contact</h2>
             <p className="text-white/70 leading-relaxed">
               If you have any questions about these Terms of Service, please contact us at{" "}
               <a
