@@ -4,11 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vibetrace.app';
 
-const adminClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 function getBadgeColor(score: number | null, isActive: boolean): { fill: string; text: string; label: string } {
   if (!isActive || score === null) {
@@ -72,6 +74,7 @@ export async function GET(
   try {
     const { token } = await params;
     const summaryUrl = `${APP_URL}/api/badge/${token}/summary`;
+    const adminClient = getAdminClient();
 
     // Look up badge by token (public read policy allows this)
     const { data: badge, error: badgeError } = await adminClient

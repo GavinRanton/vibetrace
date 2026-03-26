@@ -11,11 +11,13 @@ export const metadata = {
 };
 export const dynamic = "force-dynamic";
 
-const adminClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 type ReportPageProps = {
   params: Promise<{ token: string }>;
@@ -44,6 +46,7 @@ const severityClasses: Record<string, string> = {
 
 export default async function SharedReportPage({ params }: ReportPageProps) {
   const { token } = await params;
+  const adminClient = getAdminClient();
 
   const { data: scan, error: scanError } = await adminClient
     .from("scans")

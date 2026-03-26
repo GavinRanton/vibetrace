@@ -4,11 +4,13 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const adminClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
 
     const ghUser = await ghRes.json();
     const githubUsername = ghUser.login ?? null;
+    const adminClient = getAdminClient();
 
     const { error: upsertError } = await adminClient.from("users").upsert({
       id: user.id,
