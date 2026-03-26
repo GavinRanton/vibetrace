@@ -1,6 +1,10 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vibetrace.app';
 const FROM_ADDRESS = 'VibeTrace <scans@vibetrace.app>';
@@ -212,7 +216,7 @@ export async function sendScanCompleteEmail(
         ? `${result.high_count} high severity finding${result.high_count !== 1 ? 's' : ''} found`
         : 'Scan complete — review your results';
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await getResend().emails.send({
       from: FROM_ADDRESS,
       to: [to],
       subject: `[VibeTrace] ${result.repo_name} — Score: ${result.score}/100 (${scoreLabel})`,

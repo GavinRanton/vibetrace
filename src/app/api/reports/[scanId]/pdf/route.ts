@@ -5,11 +5,13 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { generateScanReport } from '@/lib/pdf';
 
-const adminClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 export async function GET(
   request: NextRequest,
@@ -17,6 +19,7 @@ export async function GET(
 ) {
   try {
     const { scanId } = await params;
+    const adminClient = getAdminClient();
 
     // Authenticate user
     const cookieStore = await cookies();

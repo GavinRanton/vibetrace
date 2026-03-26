@@ -4,11 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://vibetrace.app';
 
-const adminClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 function getScoreColor(score: number): string {
   if (score >= 80) return '#22C55E';
@@ -182,6 +184,7 @@ export async function GET(
 ) {
   try {
     const { token } = await params;
+    const adminClient = getAdminClient();
 
     // Look up badge by token
     const { data: badge, error: badgeError } = await adminClient

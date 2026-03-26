@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 
+// Provide build-time placeholder values so pages can be statically prerendered
+// without real Supabase credentials. The actual values are injected at runtime.
+process.env.NEXT_PUBLIC_SUPABASE_URL ??= "https://build-placeholder.supabase.co";
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= "build-placeholder-anon-key";
+
 const securityHeaders = [
   {
     key: "Strict-Transport-Security",

@@ -5,13 +5,16 @@ import Stripe from 'stripe';
 
 export const runtime = 'nodejs';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function upsertSubscription(sub: any, fallbackUserId?: string) {
+  const supabaseAdmin = getAdminClient();
   const priceId: string = sub.items?.data?.[0]?.price?.id ?? '';
   const plan = planFromPriceId(priceId);
   const customerId: string = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id ?? '';
@@ -91,6 +94,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const supabaseAdmin = getAdminClient();
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;

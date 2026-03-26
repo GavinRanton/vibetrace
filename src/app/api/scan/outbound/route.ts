@@ -5,11 +5,13 @@ import type { NextRequest } from "next/server";
 
 import { processScan } from "@/lib/scanner/pipeline";
 
-const adminClient = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+}
 
 const DAILY_LIMIT = 100;
 const RATE_LIMIT_STATE_KEY = "__vibetraceOutboundRateLimitState";
@@ -112,6 +114,7 @@ export async function POST(request: NextRequest) {
 
     const trimmedRepoFullName = repoFullName.trim();
     const trimmedOwnerEmail = ownerEmail.trim().toLowerCase();
+    const adminClient = getAdminClient();
 
     const { data: systemUser, error: systemUserError } = await adminClient
       .from("users")
