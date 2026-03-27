@@ -34,7 +34,7 @@ const features = {
     "GDPR checklist",
   ],
   starter: [
-    "Unlimited scans",
+    "Up to 500 scans/month",
     "15+ vulnerability classes",
     "Fix prompts (AI-powered)",
     "Security score",

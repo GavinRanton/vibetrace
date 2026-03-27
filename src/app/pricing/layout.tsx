@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Pricing — Free & Pro Security Scanning",
   description:
-    "Start free with 1 full scan. Upgrade to Pro for unlimited scans, shareable reports, and priority support. No credit card required to start.",
+    "Start free with 1 full scan. Upgrade to Pro for up to 500 scans/month, shareable reports, and priority support. No credit card required to start.",
   alternates: { canonical: "https://vibetrace.app/pricing" },
   openGraph: {
     title: "VibeTrace Pricing — Free & Pro Plans",
