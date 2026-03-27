@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { AccountActions } from './AccountActions'
 import { GitHubTokenSection } from './GitHubTokenSection'
+import { FeedbackSection } from '@/components/feedback/FeedbackSection'
 
 export default async function AccountPage() {
   const supabase = await createServerSupabaseClient()
@@ -40,18 +41,21 @@ export default async function AccountPage() {
     free: 'Free',
     starter: 'Starter',
     pro: 'Pro',
+    founder: 'Founder Member',
   }
 
   const planColor: Record<string, string> = {
     free: '#94A3B8',
     starter: '#3B82F6',
     pro: '#8B5CF6',
+    founder: '#F59E0B',
   }
 
   const planLimit: Record<string, string> = {
     free: '5 scans / month',
     starter: '50 scans / month',
     pro: 'Unlimited scans',
+    founder: '500 scans / month',
   }
 
   return (
@@ -139,7 +143,7 @@ export default async function AccountPage() {
         </section>
 
         {/* Section 4: Data */}
-        <section className="border border-white/5 rounded-xl bg-[#1E1E2E]/60">
+        <section className="border border-white/5 rounded-xl bg-[#1E1E2E]/60 mb-6">
           <div className="px-6 py-5 border-b border-white/5">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[#94A3B8]">Data</h2>
           </div>
@@ -147,6 +151,18 @@ export default async function AccountPage() {
             <AccountActions section="data" />
           </div>
         </section>
+
+        {/* Section 5: Founder Feedback (founder plan only) */}
+        {plan === 'founder' && (
+          <section className="border rounded-xl bg-[#1E1E2E]/60" style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}>
+            <div className="px-6 py-5 border-b" style={{ borderColor: 'rgba(245, 158, 11, 0.1)' }}>
+              <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: '#F59E0B' }}>
+                Founder Feedback
+              </h2>
+            </div>
+            <FeedbackSection userPlan={plan} />
+          </section>
+        )}
       </div>
     </div>
   )
