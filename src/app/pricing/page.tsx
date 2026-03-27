@@ -295,13 +295,13 @@ export default function PricingPage() {
                   <Badge className="bg-amber-400/20 text-amber-400 border-amber-400/30 text-xs">One-time · Lifetime</Badge>
                 </div>
                 <p className="text-white/50 text-sm max-w-lg">
-                  Pay once, use forever. Up to 500 scans per month, all Pro features, and a direct line to shape the product roadmap.
+                  Pay once, use forever. Includes 2,500 lifetime scans, all Pro features, and a direct line to shape the product roadmap.
                   Founder pricing is locked — it will never increase.
                 </p>
                 <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-white/40">
                   {[
                     "Everything in Pro — forever",
-                    "500 scans/month",
+                    "2,500 lifetime scans",
                     "Founder Member badge",
                     "Direct feedback channel",
                     "Feature voting",
