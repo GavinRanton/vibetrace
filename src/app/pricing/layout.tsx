@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://vibetrace.app/pricing" },
   openGraph: {
     title: "VibeTrace Pricing — Free & Pro Plans",
-    description: "1 free scan to get started. Pro for unlimited security and SEO scanning.",
+    description: "1 free scan to get started. Pro for unlimited scans (fair use) plus reports and monitoring.",
     url: "https://vibetrace.app/pricing",
     type: "website",
   },

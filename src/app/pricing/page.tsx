@@ -48,6 +48,7 @@ const features = {
   ],
   pro: [
     "Everything in Starter",
+    "Unlimited scans (fair use)",
     "Continuous monitoring",
     "PDF security reports",
     "Security badge for README",
