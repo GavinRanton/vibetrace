@@ -147,7 +147,7 @@ export default function TermsPage() {
               <strong className="text-white">4. Payment and Refunds:</strong> Founder Member subscriptions require a single one-time payment. This payment is non-refundable after 14 days, in accordance with the Consumer Contracts Regulations 2013. Within 14 days, a full refund is available if the Service has not been used beyond initial setup. Refund requests should be sent to our support email.
             </p>
             <p className="text-white/70 leading-relaxed mb-3">
-              <strong className="text-white">5. Usage Limits:</strong> Founder Member subscriptions include a 500 lifetime scan allocation. When this allocation is exhausted, you may purchase additional scan credits or upgrade to a monthly or annual plan. Unused scans do not expire.
+              <strong className="text-white">5. Usage Limits:</strong> Founder Member subscriptions may be subject to reasonable fair-use limits, technical rate limiting, and abuse prevention controls to protect the Service for all users. Any plan-specific limits (if applicable) are described on the pricing page and/or within your account. We reserve the right to adjust limits over time with notice if required to prevent abuse or ensure service reliability.
             </p>
             <p className="text-white/70 leading-relaxed mb-3">
               <strong className="text-white">6. Feature Availability:</strong> Your subscription includes Pro features available at purchase plus future Pro additions. New premium tiers above Pro are not automatically included, but discounted upgrade offers will be provided. We reserve the right to modify, add, or remove features.
