@@ -160,7 +160,7 @@ export default async function AccountPage() {
                 Founder Feedback
               </h2>
             </div>
-            <FeedbackSection />
+            <FeedbackSection userPlan={plan} />
           </section>
         )}
       </div>
